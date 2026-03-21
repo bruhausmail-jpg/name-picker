@@ -1,62 +1,993 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+  />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0b0f19" />
   <title>Name Picker</title>
   <style>
-    body {
-      font-family: Arial;
-      text-align: center;
-      margin-top: 50px;
+    :root{
+      --bg1:#0b0f19;
+      --bg2:#141b2d;
+      --card:rgba(255,255,255,0.08);
+      --border:rgba(255,255,255,0.14);
+      --text:#f4f7fb;
+      --muted:#b9c2d0;
+      --accent:#5eead4;
+      --accent2:#60a5fa;
+      --shadow:0 18px 40px rgba(0,0,0,0.35);
+      --radius:20px;
+      --safe-top: max(16px, env(safe-area-inset-top));
+      --safe-bottom: max(16px, env(safe-area-inset-bottom));
     }
-    input {
-      display: block;
-      margin: 10px auto;
-      padding: 8px;
-      width: 200px;
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; }
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top, #1d335d 0%, transparent 35%),
+        linear-gradient(180deg,var(--bg2),var(--bg1));
+      overflow-x:hidden;
     }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
+
+    .app{
+      width:min(100%, 520px);
+      margin:0 auto;
+      padding:var(--safe-top) 16px var(--safe-bottom);
     }
-    #result {
-      margin-top: 20px;
-      font-size: 24px;
-      font-weight: bold;
+
+    .hero{
+      text-align:center;
+      margin-bottom:14px;
+    }
+    .title{
+      font-size:32px;
+      font-weight:800;
+      letter-spacing:-0.04em;
+      margin:0;
+    }
+    .subtitle{
+      margin:6px 0 0;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding:14px;
+      margin-top:12px;
+    }
+
+    .wheel-wrap{
+      position:relative;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding-top:10px;
+      padding-bottom:6px;
+    }
+
+    .pointer{
+      position:absolute;
+      top:-4px;
+      left:50%;
+      transform:translateX(-50%);
+      width:0;height:0;
+      border-left:14px solid transparent;
+      border-right:14px solid transparent;
+      border-top:24px solid #ffd166;
+      filter:drop-shadow(0 4px 8px rgba(0,0,0,0.45));
+      z-index:4;
+    }
+
+    canvas{
+      width:min(84vw, 340px);
+      height:min(84vw, 340px);
+      max-width:340px;
+      max-height:340px;
+      display:block;
+      border-radius:50%;
+      background:rgba(8,12,22,0.55);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    .countdown,
+    .winner-overlay{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+      z-index:5;
+      border-radius:24px;
+    }
+
+    .countdown span{
+      font-size:84px;
+      font-weight:900;
+      text-shadow:0 8px 28px rgba(0,0,0,0.45);
+      transform:scale(0.8);
+      opacity:0;
+      transition:all .2s ease;
+    }
+
+    .winner-overlay{
+      background:linear-gradient(180deg, rgba(10,14,24,0.05), rgba(10,14,24,0.72));
+      opacity:0;
+      transition:opacity .25s ease;
+    }
+
+    .winner-pill{
+      padding:14px 18px;
+      border-radius:999px;
+      background:rgba(0,0,0,0.55);
+      border:1px solid rgba(255,255,255,0.14);
+      font-weight:800;
+      font-size:28px;
+      box-shadow:var(--shadow);
+      transform:translateY(12px) scale(0.92);
+      transition:transform .25s ease;
+    }
+
+    .winner-overlay.show{ opacity:1; }
+    .winner-overlay.show .winner-pill{ transform:translateY(0) scale(1); }
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+
+    .input{
+      width:100%;
+      border:1px solid rgba(255,255,255,0.12);
+      border-radius:14px;
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      padding:14px 14px;
+      font-size:16px;
+      outline:none;
+    }
+    .input::placeholder{ color:#9aa6b6; }
+    .input:focus{
+      border-color:rgba(96,165,250,0.7);
+      box-shadow:0 0 0 3px rgba(96,165,250,0.16);
+    }
+
+    .button-row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:12px;
+    }
+
+    .button-row.single{
+      grid-template-columns:1fr;
+    }
+
+    button{
+      appearance:none;
+      border:none;
+      border-radius:16px;
+      min-height:52px;
+      padding:12px 14px;
+      font-size:16px;
+      font-weight:700;
+      color:#08111f;
+      background:linear-gradient(180deg,#8ff7ea,#5eead4);
+      box-shadow:0 10px 20px rgba(94,234,212,0.18);
+      touch-action:manipulation;
+    }
+    button.secondary{
+      color:var(--text);
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.12);
+      box-shadow:none;
+    }
+    button.ghost{
+      color:var(--text);
+      background:transparent;
+      border:1px dashed rgba(255,255,255,0.16);
+      box-shadow:none;
+    }
+    button:active{
+      transform:translateY(1px) scale(0.995);
+    }
+    button:disabled{
+      opacity:.55;
+    }
+
+    .pill-row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+
+    .pill{
+      font-size:13px;
+      padding:8px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.12);
+      color:var(--muted);
+    }
+    .pill.active{
+      color:#06131e;
+      background:linear-gradient(180deg,#93c5fd,#60a5fa);
+      border-color:transparent;
+    }
+
+    .section-title{
+      margin:0 0 10px;
+      font-size:15px;
+      font-weight:800;
+      color:#dbe6f5;
+      letter-spacing:0.01em;
+    }
+
+    .list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      max-height:220px;
+      overflow:auto;
+      padding-right:2px;
+    }
+
+    .list-item{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      border-radius:14px;
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.08);
+      padding:10px 12px;
+      font-size:14px;
+    }
+    .list-item .meta{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:2px;
+    }
+    .list-item strong{
+      display:block;
+      font-size:14px;
+    }
+
+    .tiny{
+      font-size:12px;
+      color:var(--muted);
+      text-align:center;
+      margin-top:10px;
+    }
+
+    .flash{
+      position:fixed;
+      inset:0;
+      background:white;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .15s ease;
+      z-index:9;
+    }
+    .flash.show{ opacity:0.22; }
+
+    .status{
+      margin-top:10px;
+      min-height:18px;
+      font-size:13px;
+      color:var(--muted);
+      text-align:center;
+    }
+
+    .group-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-left:auto;
+    }
+
+    .mini-btn{
+      min-height:auto;
+      padding:8px 10px;
+      font-size:13px;
+      border-radius:12px;
+      color:var(--text);
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.12);
+      box-shadow:none;
     }
   </style>
 </head>
 <body>
+  <div class="flash" id="flash"></div>
 
-  <h1>🎯 Random Name Picker</h1>
+  <div class="app">
+    <div class="hero">
+      <h1 class="title">Name Picker</h1>
+      <p class="subtitle">Optimized for iPhone. Works locally in Safari.</p>
+    </div>
 
-  <input type="text" id="name1" placeholder="Enter name 1">
-  <input type="text" id="name2" placeholder="Enter name 2">
-  <input type="text" id="name3" placeholder="Enter name 3">
-  <input type="text" id="name4" placeholder="Enter name 4">
+    <div class="card">
+      <div class="wheel-wrap">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="340" height="340"></canvas>
+        <div class="countdown" id="countdown"><span id="countText"></span></div>
+        <div class="winner-overlay" id="winnerOverlay">
+          <div class="winner-pill" id="winnerText">Winner</div>
+        </div>
+      </div>
 
-  <button onclick="pickName()">Pick a Name</button>
+      <div class="button-row">
+        <button id="spinBtn">Spin 🎡</button>
+        <button class="secondary" id="muteBtn">Sound: On</button>
+      </div>
 
-  <div id="result"></div>
+      <div class="pill-row">
+        <div class="pill" id="noRepeatPill">No Repeat: Off</div>
+        <div class="pill" id="removeWinnerPill">Remove Winner: Off</div>
+      </div>
+
+      <div class="button-row">
+        <button class="secondary" id="noRepeatBtn">Toggle No Repeat</button>
+        <button class="secondary" id="removeWinnerBtn">Toggle Remove Winner</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Names</h2>
+      <div class="grid">
+        <input class="input" id="name1" placeholder="Name 1" maxlength="24" />
+        <input class="input" id="name2" placeholder="Name 2" maxlength="24" />
+        <input class="input" id="name3" placeholder="Name 3" maxlength="24" />
+        <input class="input" id="name4" placeholder="Name 4" maxlength="24" />
+      </div>
+
+      <div class="grid" style="margin-top:12px;">
+        <input class="input" id="groupName" placeholder="Group name (example: Friends)" maxlength="30" />
+      </div>
+
+      <div class="button-row">
+        <button class="secondary" id="saveGroupBtn">Save Group</button>
+        <button class="secondary" id="loadLatestBtn">Load Latest Group</button>
+      </div>
+
+      <div class="status" id="groupStatus"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Saved Groups</h2>
+      <div class="list" id="groupsList"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Past Winners</h2>
+      <div class="list" id="historyList"></div>
+      <div class="button-row">
+        <button class="ghost" id="clearHistoryBtn">Clear History</button>
+        <button class="ghost" id="resetNamesBtn">Reset Names</button>
+      </div>
+    </div>
+
+    <p class="tiny">Tip: In Safari, tap Share → Add to Home Screen.</p>
+  </div>
 
   <script>
-    function pickName() {
-      const names = [
-        document.getElementById("name1").value,
-        document.getElementById("name2").value,
-        document.getElementById("name3").value,
-        document.getElementById("name4").value
-      ].filter(name => name.trim() !== "");
+    const $ = (id) => document.getElementById(id);
 
-      if (names.length === 0) {
-        document.getElementById("result").innerText = "Please enter at least one name!";
+    const canvas = $('wheel');
+    const ctx = canvas.getContext('2d');
+
+    const inputs = [$('name1'), $('name2'), $('name3'), $('name4')];
+    const spinBtn = $('spinBtn');
+    const muteBtn = $('muteBtn');
+    const noRepeatBtn = $('noRepeatBtn');
+    const removeWinnerBtn = $('removeWinnerBtn');
+    const noRepeatPill = $('noRepeatPill');
+    const removeWinnerPill = $('removeWinnerPill');
+    const saveGroupBtn = $('saveGroupBtn');
+    const loadLatestBtn = $('loadLatestBtn');
+    const clearHistoryBtn = $('clearHistoryBtn');
+    const resetNamesBtn = $('resetNamesBtn');
+    const historyList = $('historyList');
+    const groupsList = $('groupsList');
+    const groupNameInput = $('groupName');
+    const groupStatus = $('groupStatus');
+    const countText = $('countText');
+    const winnerOverlay = $('winnerOverlay');
+    const winnerText = $('winnerText');
+    const flash = $('flash');
+
+    const STORAGE_KEYS = {
+      groups: 'iphone_name_picker_groups_v2',
+      history: 'iphone_name_picker_history_v1',
+      settings: 'iphone_name_picker_settings_v1',
+      names: 'iphone_name_picker_current_names_v1',
+      latestGroup: 'iphone_name_picker_latest_group_v2'
+    };
+
+    let state = {
+      angle: 0,
+      spinning: false,
+      muted: false,
+      noRepeat: false,
+      removeWinner: false,
+      lastWinner: null,
+      history: [],
+      names: [],
+      groups: {}
+    };
+
+    function status(msg) {
+      groupStatus.textContent = msg || '';
+    }
+
+    function getNames() {
+      return inputs.map(i => i.value.trim()).filter(Boolean);
+    }
+
+    function saveCurrentNames() {
+      localStorage.setItem(STORAGE_KEYS.names, JSON.stringify(inputs.map(i => i.value)));
+    }
+
+    function restoreCurrentNames() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.names) || '[]');
+        inputs.forEach((input, i) => input.value = saved[i] || '');
+      } catch {}
+    }
+
+    function loadSettings() {
+      try {
+        const s = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{}');
+        state.muted = !!s.muted;
+        state.noRepeat = !!s.noRepeat;
+        state.removeWinner = !!s.removeWinner;
+        state.lastWinner = s.lastWinner || null;
+      } catch {}
+      syncSettingsUI();
+    }
+
+    function saveSettings() {
+      localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify({
+        muted: state.muted,
+        noRepeat: state.noRepeat,
+        removeWinner: state.removeWinner,
+        lastWinner: state.lastWinner
+      }));
+    }
+
+    function loadHistory() {
+      try {
+        state.history = JSON.parse(localStorage.getItem(STORAGE_KEYS.history) || '[]');
+      } catch {
+        state.history = [];
+      }
+      renderHistory();
+    }
+
+    function saveHistory() {
+      localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(state.history));
+    }
+
+    function loadGroups() {
+      try {
+        state.groups = JSON.parse(localStorage.getItem(STORAGE_KEYS.groups) || '{}');
+      } catch {
+        state.groups = {};
+      }
+      renderGroups();
+    }
+
+    function saveGroups() {
+      localStorage.setItem(STORAGE_KEYS.groups, JSON.stringify(state.groups));
+    }
+
+    function renderHistory() {
+      historyList.innerHTML = '';
+      if (!state.history.length) {
+        const empty = document.createElement('div');
+        empty.className = 'list-item';
+        empty.innerHTML = '<div><strong>No winners yet</strong><div class="meta">Spin the wheel to start.</div></div>';
+        historyList.appendChild(empty);
         return;
       }
 
-      const randomIndex = Math.floor(Math.random() * names.length);
-      document.getElementById("result").innerText = `🎉 Selected: ${names[randomIndex]}`;
+      state.history.slice().reverse().forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'list-item';
+        row.innerHTML = `
+          <div>
+            <strong>${escapeHtml(item.name)}</strong>
+            <div class="meta">${escapeHtml(item.time)}</div>
+          </div>
+          <div>🏆</div>
+        `;
+        historyList.appendChild(row);
+      });
     }
-  </script>
 
+    function renderGroups() {
+      groupsList.innerHTML = '';
+      const entries = Object.entries(state.groups);
+
+      if (!entries.length) {
+        const empty = document.createElement('div');
+        empty.className = 'list-item';
+        empty.innerHTML = '<div><strong>No saved groups yet</strong><div class="meta">Add names, type a group name, then tap Save Group.</div></div>';
+        groupsList.appendChild(empty);
+        return;
+      }
+
+      entries.sort((a, b) => {
+        const ta = a[1]?.savedAt || '';
+        const tb = b[1]?.savedAt || '';
+        return tb.localeCompare(ta);
+      });
+
+      entries.forEach(([name, data]) => {
+        const row = document.createElement('div');
+        row.className = 'list-item';
+
+        const left = document.createElement('div');
+        left.innerHTML = `
+          <strong>${escapeHtml(name)}</strong>
+          <div class="meta">${escapeHtml((data.names || []).join(', '))}</div>
+        `;
+
+        const actions = document.createElement('div');
+        actions.className = 'group-actions';
+
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'mini-btn';
+        loadBtn.textContent = 'Load';
+        loadBtn.addEventListener('click', () => loadGroupByName(name));
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'mini-btn';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => deleteGroup(name));
+
+        actions.appendChild(loadBtn);
+        actions.appendChild(delBtn);
+
+        row.appendChild(left);
+        row.appendChild(actions);
+        groupsList.appendChild(row);
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function syncSettingsUI() {
+      muteBtn.textContent = state.muted ? 'Sound: Off' : 'Sound: On';
+      noRepeatPill.textContent = `No Repeat: ${state.noRepeat ? 'On' : 'Off'}`;
+      removeWinnerPill.textContent = `Remove Winner: ${state.removeWinner ? 'On' : 'Off'}`;
+      noRepeatPill.classList.toggle('active', state.noRepeat);
+      removeWinnerPill.classList.toggle('active', state.removeWinner);
+    }
+
+    function drawWheel() {
+      const names = getNames();
+      state.names = names;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!names.length) {
+        ctx.beginPath();
+        ctx.arc(170, 170, 150, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.font = '700 20px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Add names to start', 170, 170);
+        return;
+      }
+
+      const center = 170;
+      const radius = 150;
+      const slice = (Math.PI * 2) / names.length;
+      const colors = ['#60a5fa', '#5eead4', '#f472b6', '#f59e0b', '#a78bfa', '#34d399'];
+
+      for (let i = 0; i < names.length; i++) {
+        const start = i * slice + state.angle;
+        const end = (i + 1) * slice + state.angle;
+
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, start, end);
+        ctx.closePath();
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(10,14,24,0.24)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(start + slice / 2);
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#08111f';
+        ctx.font = '700 17px -apple-system, sans-serif';
+        const label = names[i].length > 12 ? names[i].slice(0, 12) + '…' : names[i];
+        ctx.fillText(label, radius - 18, 0);
+        ctx.restore();
+      }
+
+      ctx.beginPath();
+      ctx.arc(center, center, 24, 0, Math.PI * 2);
+      ctx.fillStyle = '#08111f';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    function playTone(freq, duration, type = 'sine', gainValue = 0.03) {
+      if (state.muted) return;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!window._audioCtx) window._audioCtx = new AudioCtx();
+      const audioCtx = window._audioCtx;
+
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = type;
+      osc.frequency.value = freq;
+
+      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(gainValue, audioCtx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration + 0.02);
+    }
+
+    function tickSound() {
+      playTone(900, 0.04, 'square', 0.02);
+    }
+
+    function winSound() {
+      playTone(660, 0.09, 'triangle', 0.045);
+      setTimeout(() => playTone(880, 0.11, 'triangle', 0.05), 110);
+      setTimeout(() => playTone(1320, 0.18, 'triangle', 0.055), 240);
+    }
+
+    function burstConfetti() {
+      const pieces = [];
+      const count = 140;
+      const colors = ['#5eead4', '#60a5fa', '#f472b6', '#f59e0b', '#ffffff'];
+
+      for (let i = 0; i < count; i++) {
+        pieces.push({
+          x: window.innerWidth / 2,
+          y: 120,
+          vx: (Math.random() - 0.5) * 10,
+          vy: Math.random() * -10 - 3,
+          g: 0.18 + Math.random() * 0.12,
+          size: 6 + Math.random() * 8,
+          rot: Math.random() * Math.PI,
+          vr: (Math.random() - 0.5) * 0.28,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          life: 60 + Math.random() * 25
+        });
+      }
+
+      const overlay = document.createElement('canvas');
+      overlay.width = window.innerWidth * devicePixelRatio;
+      overlay.height = window.innerHeight * devicePixelRatio;
+      overlay.style.position = 'fixed';
+      overlay.style.inset = '0';
+      overlay.style.width = '100vw';
+      overlay.style.height = '100vh';
+      overlay.style.pointerEvents = 'none';
+      overlay.style.zIndex = '10';
+      document.body.appendChild(overlay);
+
+      const c = overlay.getContext('2d');
+      c.scale(devicePixelRatio, devicePixelRatio);
+
+      function frame() {
+        c.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+        pieces.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += p.g;
+          p.rot += p.vr;
+          p.life -= 1;
+
+          c.save();
+          c.translate(p.x, p.y);
+          c.rotate(p.rot);
+          c.fillStyle = p.color;
+          c.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.7);
+          c.restore();
+        });
+
+        for (let i = pieces.length - 1; i >= 0; i--) {
+          if (pieces[i].life <= 0 || pieces[i].y > window.innerHeight + 40) {
+            pieces.splice(i, 1);
+          }
+        }
+
+        if (pieces.length) {
+          requestAnimationFrame(frame);
+        } else {
+          overlay.remove();
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    function flashScreen() {
+      flash.classList.add('show');
+      setTimeout(() => flash.classList.remove('show'), 130);
+    }
+
+    function startCountdownAndSpin() {
+      if (state.spinning) return;
+
+      const names = getNames();
+      if (!names.length) {
+        alert('Enter at least 1 name.');
+        return;
+      }
+
+      state.spinning = true;
+      winnerOverlay.classList.remove('show');
+      spinBtn.disabled = true;
+
+      let n = 3;
+      countText.textContent = String(n);
+      countText.style.opacity = '1';
+      countText.style.transform = 'scale(1)';
+      playTone(520, 0.06, 'triangle', 0.03);
+
+      const timer = setInterval(() => {
+        if (n > 1) {
+          n -= 1;
+          countText.textContent = String(n);
+          countText.style.opacity = '0';
+          countText.style.transform = 'scale(0.85)';
+          setTimeout(() => {
+            countText.style.opacity = '1';
+            countText.style.transform = 'scale(1)';
+            playTone(520, 0.06, 'triangle', 0.03);
+          }, 30);
+        } else {
+          clearInterval(timer);
+          countText.textContent = 'Go!';
+          playTone(720, 0.08, 'triangle', 0.04);
+          setTimeout(() => {
+            countText.style.opacity = '0';
+            runSpin();
+          }, 250);
+        }
+      }, 650);
+    }
+
+    function runSpin() {
+      const names = getNames();
+      if (!names.length) {
+        state.spinning = false;
+        spinBtn.disabled = false;
+        return;
+      }
+
+      let speed = 0.34 + Math.random() * 0.18;
+      let tickGate = 0;
+
+      function animate() {
+        state.angle += speed;
+        speed *= 0.985;
+        drawWheel();
+
+        tickGate += speed;
+        if (tickGate > 0.22) {
+          tickSound();
+          tickGate = 0;
+        }
+
+        if (speed > 0.0022) {
+          requestAnimationFrame(animate);
+        } else {
+          finishSpin();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function finishSpin() {
+      const names = getNames();
+      if (!names.length) {
+        state.spinning = false;
+        spinBtn.disabled = false;
+        return;
+      }
+
+      const slice = (Math.PI * 2) / names.length;
+      let rawIndex = Math.floor((names.length - ((state.angle % (Math.PI * 2)) / slice)) % names.length);
+      if (rawIndex < 0) rawIndex += names.length;
+
+      let winner = names[rawIndex];
+
+      if (state.noRepeat && names.length > 1 && winner === state.lastWinner) {
+        rawIndex = (rawIndex + 1) % names.length;
+        winner = names[rawIndex];
+      }
+
+      state.lastWinner = winner;
+      saveSettings();
+
+      winnerText.textContent = `🎉 ${winner}`;
+      winnerOverlay.classList.add('show');
+      flashScreen();
+      burstConfetti();
+      winSound();
+
+      const now = new Date();
+      state.history.push({
+        name: winner,
+        time: now.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+      });
+      saveHistory();
+      renderHistory();
+
+      if (state.removeWinner) {
+        const found = inputs.find(i => i.value.trim() === winner);
+        if (found) found.value = '';
+        saveCurrentNames();
+        setTimeout(drawWheel, 10);
+      }
+
+      state.spinning = false;
+      spinBtn.disabled = false;
+    }
+
+    function saveGroup() {
+      const names = inputs.map(i => i.value.trim()).filter(Boolean);
+      const groupName = groupNameInput.value.trim();
+
+      if (!names.length) {
+        status('Enter some names first.');
+        return;
+      }
+      if (!groupName) {
+        status('Type a group name first.');
+        groupNameInput.focus();
+        return;
+      }
+
+      state.groups[groupName] = {
+        names,
+        savedAt: new Date().toISOString()
+      };
+      saveGroups();
+      localStorage.setItem(STORAGE_KEYS.latestGroup, groupName);
+      renderGroups();
+      status(`Saved group: ${groupName}`);
+      groupNameInput.value = '';
+    }
+
+    function loadGroupByName(name) {
+      const group = state.groups[name];
+      if (!group || !Array.isArray(group.names)) {
+        status('Could not load that group.');
+        return;
+      }
+
+      inputs.forEach((input, i) => input.value = group.names[i] || '');
+      localStorage.setItem(STORAGE_KEYS.latestGroup, name);
+      saveCurrentNames();
+      drawWheel();
+      status(`Loaded group: ${name}`);
+    }
+
+    function loadLatestGroup() {
+      const latest = localStorage.getItem(STORAGE_KEYS.latestGroup);
+      if (latest && state.groups[latest]) {
+        loadGroupByName(latest);
+        return;
+      }
+
+      const names = Object.keys(state.groups);
+      if (names.length) {
+        loadGroupByName(names[0]);
+      } else {
+        status('No saved groups yet.');
+      }
+    }
+
+    function deleteGroup(name) {
+      delete state.groups[name];
+      saveGroups();
+      renderGroups();
+      status(`Deleted group: ${name}`);
+    }
+
+    function clearHistory() {
+      state.history = [];
+      saveHistory();
+      renderHistory();
+    }
+
+    function resetNames() {
+      inputs.forEach(i => i.value = '');
+      saveCurrentNames();
+      drawWheel();
+    }
+
+    inputs.forEach(input => {
+      input.addEventListener('input', () => {
+        saveCurrentNames();
+        drawWheel();
+      });
+    });
+
+    saveGroupBtn.addEventListener('click', saveGroup);
+    loadLatestBtn.addEventListener('click', loadLatestGroup);
+
+    spinBtn.addEventListener('click', startCountdownAndSpin);
+    muteBtn.addEventListener('click', () => {
+      state.muted = !state.muted;
+      saveSettings();
+      syncSettingsUI();
+    });
+    noRepeatBtn.addEventListener('click', () => {
+      state.noRepeat = !state.noRepeat;
+      saveSettings();
+      syncSettingsUI();
+    });
+    removeWinnerBtn.addEventListener('click', () => {
+      state.removeWinner = !state.removeWinner;
+      saveSettings();
+      syncSettingsUI();
+    });
+    clearHistoryBtn.addEventListener('click', clearHistory);
+    resetNamesBtn.addEventListener('click', resetNames);
+
+    restoreCurrentNames();
+    loadSettings();
+    loadHistory();
+    loadGroups();
+    drawWheel();
+  </script>
 </body>
 </html>
