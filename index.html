@@ -3,25 +3,58 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Name Picker Pro</title>
+<title>Name Picker</title>
+
 <style>
-body { font-family: Arial; text-align: center; background:#111; color:white; }
-canvas { margin-top:20px; }
-button { padding:12px 20px; margin:10px; font-size:16px; border-radius:10px; }
+body {
+  font-family: -apple-system, Arial;
+  background: #0b0f19;
+  color: white;
+  text-align: center;
+}
+
+h1 {
+  font-size: 32px;
+  margin-top: 20px;
+}
+
+input {
+  display: block;
+  margin: 6px auto;
+  padding: 10px;
+  width: 200px;
+  border-radius: 10px;
+  border: none;
+}
+
+button {
+  margin-top: 15px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: none;
+  font-size: 18px;
+  background: #5eead4;
+  color: black;
+}
+
+canvas {
+  margin-top: 20px;
+}
 </style>
 </head>
+
 <body>
 
 <h1>Name Picker 🎡</h1>
 
-<input id="n1" placeholder="Name 1"><br>
-<input id="n2" placeholder="Name 2"><br>
-<input id="n3" placeholder="Name 3"><br>
-<input id="n4" placeholder="Name 4"><br>
+<input id="n1" placeholder="Name 1">
+<input id="n2" placeholder="Name 2">
+<input id="n3" placeholder="Name 3">
+<input id="n4" placeholder="Name 4">
 
 <button id="spin">SPIN</button>
 
-<canvas id="wheel" width="300" height="300"></canvas>
+<canvas id="wheel" width="320" height="320"></canvas>
 
 <h2 id="winner"></h2>
 
@@ -39,10 +72,11 @@ const sounds = {
   tick: new Audio('https://assets.mixkit.co/sfx/preview/mixkit-click-metallic-1104.mp3'),
   win: new Audio('https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3')
 };
+
 sounds.tick.volume = 0.4;
 sounds.win.volume = 0.7;
 
-// unlock audio on iPhone
+// unlock iPhone audio
 spinBtn.addEventListener('click', () => {
   sounds.tick.play().catch(()=>{});
   sounds.win.play().catch(()=>{});
@@ -54,7 +88,8 @@ function getNames(){
 
 function drawWheel(){
   const names = getNames();
-  ctx.clearRect(0,0,300,300);
+  ctx.clearRect(0,0,320,320);
+
   if(names.length === 0) return;
 
   const slice = (Math.PI*2)/names.length;
@@ -64,16 +99,16 @@ function drawWheel(){
     const end = start + slice;
 
     ctx.beginPath();
-    ctx.moveTo(150,150);
-    ctx.arc(150,150,140,start,end);
+    ctx.moveTo(160,160);
+    ctx.arc(160,160,150,start,end);
     ctx.fillStyle = `hsl(${i*90},70%,60%)`;
     ctx.fill();
 
     ctx.save();
-    ctx.translate(150,150);
+    ctx.translate(160,160);
     ctx.rotate(start + slice/2);
     ctx.fillStyle = "#000";
-    ctx.fillText(name,100,0);
+    ctx.fillText(name,110,0);
     ctx.restore();
   });
 }
@@ -96,13 +131,14 @@ function getWinner(names){
 
 function spin(){
   if(spinning) return;
+
   const names = getNames();
   if(names.length === 0) return;
 
   spinning = true;
 
   let velocity = 0;
-  let acceleration = 0.3;
+  let acceleration = 0.25;
   let deceleration = 0.992;
   let maxSpeed = 0.6;
   let time = 0;
@@ -143,7 +179,7 @@ function finish(names){
     navigator.vibrate([120,60,120]);
   }
 
-  // screen shake
+  // shake
   document.body.animate([
     { transform: 'translateX(0)' },
     { transform: 'translateX(-5px)' },
