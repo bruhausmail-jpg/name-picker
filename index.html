@@ -321,7 +321,10 @@ function loadLatestGroup(){
   if(names.length) loadGroupByName(names[0]); else status('No saved groups yet.');
 }
 
-spinBtn.onclick=startCountdownAndSpin;
+spinBtn.onclick = () => {
+  initAudio(); // unlock sound on iPhone
+  startCountdownAndSpin();
+};
 muteBtn.onclick=()=>{ state.muted=!state.muted; saveSettings(); syncSettingsUI(); };
 noRepeatBtn.onclick=()=>{ state.noRepeat=!state.noRepeat; saveSettings(); syncSettingsUI(); };
 removeWinnerBtn.onclick=()=>{ state.removeWinner=!state.removeWinner; saveSettings(); syncSettingsUI(); };
