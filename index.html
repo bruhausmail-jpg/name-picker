@@ -433,11 +433,11 @@ function runSpin() {
   const names = getNames();
   if (!names.length) { state.spinning = false; spinBtn.disabled = false; return; }
   let velocity = 0;
-  const acceleration = 0.25 + Math.random() * 0.15;
-  const deceleration = 0.992;
-  const maxSpeed = 0.5 + Math.random() * 0.2;
+  const acceleration = 0.35 + Math.random() * 0.1;
+  const deceleration = 0.975;
+  const maxSpeed = 0.45 + Math.random() * 0.1;
   let spinningTime = 0;
-  const totalSpinTime = 2000 + Math.random() * 1500;
+  const totalSpinTime = 1400 + Math.random() * 800;
   let tickGate = 0;
   function animate() {
     spinningTime += 16;
