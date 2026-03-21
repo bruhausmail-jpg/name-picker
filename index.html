@@ -194,6 +194,19 @@ let state = {
 };
 
 function unlockAudio() {
+  try {
+    sounds.tick.volume = 0.01;
+    sounds.tick.currentTime = 0;
+    sounds.tick.play();
+
+    setTimeout(() => {
+      sounds.tick.pause();
+      sounds.tick.currentTime = 0;
+      sounds.tick.volume = 0.35;
+    }, 50);
+
+  } catch (e) {}
+}
   sounds.tick.play().then(() => { sounds.tick.pause(); sounds.tick.currentTime = 0; }).catch(() => {});
   sounds.win.play().then(() => { sounds.win.pause(); sounds.win.currentTime = 0; }).catch(() => {});
 }
@@ -451,7 +464,10 @@ function clearHistory() { state.history = []; saveHistory(); renderHistory(); }
 function resetNames() { inputs.forEach(i => i.value = ''); saveCurrentNames(); drawWheel(); status('Cleared names'); }
 
 inputs.forEach(input => input.addEventListener('input', () => { saveCurrentNames(); drawWheel(); }));
-spinBtn.addEventListener('click', startCountdownAndSpin);
+spinBtn.addEventListener('click', () => {
+  unlockAudio();   // 🔥 force audio unlock
+  startCountdownAndSpin();
+});
 muteBtn.addEventListener('click', () => { state.muted = !state.muted; saveSettings(); syncSettingsUI(); });
 noRepeatBtn.addEventListener('click', () => { state.noRepeat = !state.noRepeat; saveSettings(); syncSettingsUI(); });
 removeWinnerBtn.addEventListener('click', () => { state.removeWinner = !state.removeWinner; saveSettings(); syncSettingsUI(); });
