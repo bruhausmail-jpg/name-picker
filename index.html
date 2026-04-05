@@ -6,11 +6,12 @@
 <title>Spin the Wheel</title>
 <style>
   :root{
-    --bg:#f3f3f3;
+    --bg:#f2f2f2;
     --text:#111;
     --blue:#147bd1;
     --blue-hover:#0f69b4;
-    --wheel-border:#2a2a2a;
+    --wheel-border:#232323;
+    --sep:rgba(255,255,255,0.65);
   }
 
   * { box-sizing: border-box; }
@@ -24,31 +25,31 @@
   }
 
   .container{
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 20px 14px 28px;
+    max-width:760px;
+    margin:0 auto;
+    padding:20px 14px 28px;
   }
 
   h1{
-    margin: 12px 0 18px;
-    font-size: clamp(30px, 6vw, 50px);
-    font-weight: 700;
+    margin:12px 0 18px;
+    font-size:clamp(30px,6vw,50px);
+    font-weight:700;
   }
 
   textarea{
-    width:min(92vw, 640px);
+    width:min(92vw,640px);
     height:130px;
     padding:12px 14px;
     border:1px solid #d1d1d1;
     border-radius:14px;
     resize:vertical;
     font-size:16px;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family:Arial, Helvetica, sans-serif;
     background:#fff;
   }
 
   .buttons{
-    margin: 16px 0 14px;
+    margin:16px 0 14px;
     display:flex;
     justify-content:center;
     gap:18px;
@@ -72,61 +73,72 @@
   .wheel-wrap{
     position:relative;
     width:340px;
-    height:340px;
-    margin: 2px auto 8px;
+    height:350px;
+    margin:4px auto 8px;
+    overflow:visible;
   }
 
   canvas{
     width:340px;
     height:340px;
     display:block;
+    margin-top:10px;
   }
 
-  /* Cleaner flapper style pointer */
-  .pointer-base{
+  .pointer{
     position:absolute;
-    top:14px;
+    top:-4px;
     left:50%;
-    width:8px;
-    height:8px;
-    background:#222;
-    border-radius:50%;
+    width:20px;
+    height:76px;
     transform:translateX(-50%);
-    z-index:30;
+    z-index:50;
+    pointer-events:none;
+  }
+
+  .pointer-pivot{
+    position:absolute;
+    top:0;
+    left:50%;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:#262626;
+    transform:translateX(-50%);
+    z-index:3;
     box-shadow:0 1px 2px rgba(0,0,0,0.25);
   }
 
   .pointer-arm{
     position:absolute;
-    top:18px;
+    top:4px;
     left:50%;
-    width:10px;
-    height:54px;
-    background:#d91f1f;
-    border-radius:8px 8px 14px 14px;
-    transform-origin:50% 4px;
+    width:7px;
+    height:60px;
+    background:#c61e1e;
+    border-radius:7px;
     transform:translateX(-50%) rotate(0deg);
-    z-index:29;
+    transform-origin:50% 4px;
     box-shadow:0 2px 4px rgba(0,0,0,0.18);
   }
 
   .pointer-tip{
     position:absolute;
+    bottom:-11px;
     left:50%;
-    bottom:-10px;
-    transform:translateX(-50%);
     width:0;
     height:0;
-    border-left:7px solid transparent;
-    border-right:7px solid transparent;
-    border-top:14px solid #d91f1f;
+    transform:translateX(-50%);
+    border-left:8px solid transparent;
+    border-right:8px solid transparent;
+    border-top:16px solid #c61e1e;
   }
 
   .result{
-    font-size: clamp(28px, 6vw, 44px);
-    margin-top: 20px;
-    min-height: 52px;
-    font-weight: 500;
+    font-size:clamp(28px,6vw,44px);
+    margin-top:16px;
+    min-height:52px;
+    font-weight:500;
   }
 
   .small-note{
@@ -149,8 +161,12 @@
     </div>
 
     <div class="wheel-wrap">
-      <div class="pointer-base"></div>
-      <div class="pointer-arm" id="pointerArm"><div class="pointer-tip"></div></div>
+      <div class="pointer">
+        <div class="pointer-pivot"></div>
+        <div class="pointer-arm" id="pointerArm">
+          <div class="pointer-tip"></div>
+        </div>
+      </div>
       <canvas id="wheel" width="340" height="340"></canvas>
     </div>
 
@@ -168,14 +184,15 @@ const clearBtn = document.getElementById("clearBtn");
 const resultText = document.getElementById("resultText");
 const pointerArm = document.getElementById("pointerArm");
 
-const STORAGE_KEY = "spinWheelClean_v1";
+const STORAGE_KEY = "spinWheelPremium_v1";
 
 const cx = 170;
-const cy = 170;
-const wheelRadius = 150;
-const dotRingRadius = 147;
-const dotRadius = 4.2;
-const centerRadius = 20;
+const cy = 180;
+const wheelRadius = 148;
+const outerBorder = 5;
+const dotRingRadius = 145;
+const dotRadius = 3.4;
+const centerRadius = 18;
 
 let items = [];
 let rotation = 0;
@@ -183,11 +200,12 @@ let isSpinning = false;
 let winnerIndex = -1;
 let lastBoundaryIndex = -1;
 let audioCtx = null;
+let pointerResetTimer = null;
 
 const colors = [
-  "#e65050","#e99b46","#dedf49","#95df4b",
-  "#4fdf48","#4fd79a","#52ced4","#4f92d8",
-  "#4b4dde","#9250dd","#d64cda","#df4f98"
+  "#b84d4d", "#c37f4a", "#b6a94c", "#879f4c",
+  "#4e9352", "#4d8f7b", "#4b8f99", "#4c78a8",
+  "#5a5fb3", "#7c60a9", "#a05d9a", "#ae5c7b"
 ];
 
 function ensureAudio() {
@@ -195,23 +213,31 @@ function ensureAudio() {
   if (audioCtx.state === "suspended") audioCtx.resume();
 }
 
-function playClick(volume = 0.05, pitch = 1200, dur = 0.022) {
+function playClick(volume = 0.03, pitch = 1000, dur = 0.015) {
   if (!audioCtx) return;
+
   const now = audioCtx.currentTime;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
 
-  osc.type = "square";
+  osc.type = "triangle";
   osc.frequency.setValueAtTime(pitch, now);
 
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(1300, now);
+  filter.Q.value = 2.5;
+
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(volume, now + 0.002);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.0015);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
 
-  osc.connect(gain);
+  osc.connect(filter);
+  filter.connect(gain);
   gain.connect(audioCtx.destination);
+
   osc.start(now);
-  osc.stop(now + dur + 0.005);
+  osc.stop(now + dur + 0.004);
 }
 
 function saveNames() {
@@ -245,7 +271,7 @@ function shuffleArray(arr) {
 function buildWheel() {
   saveNames();
   const baseNames = namesInput.value
-    .split("\n")
+    .split("\\n")
     .map(n => n.trim())
     .filter(Boolean);
 
@@ -267,18 +293,6 @@ function buildWheel() {
   drawWheel();
 }
 
-function drawDots(arc) {
-  for (let i = 0; i < items.length; i++) {
-    const a = rotation + i * arc;
-    const x = cx + Math.cos(a) * dotRingRadius;
-    const y = cy + Math.sin(a) * dotRingRadius;
-    ctx.beginPath();
-    ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
-    ctx.fillStyle = "#111";
-    ctx.fill();
-  }
-}
-
 function fitLabel(text, maxWidth, baseFontPx) {
   let fontSize = baseFontPx;
   while (fontSize > 10) {
@@ -295,10 +309,10 @@ function drawWheel() {
   if (!items.length) {
     ctx.beginPath();
     ctx.arc(cx, cy, wheelRadius, 0, Math.PI * 2);
-    ctx.fillStyle = "#e6e6e6";
+    ctx.fillStyle = "#e4e4e4";
     ctx.fill();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "#2a2a2a";
+    ctx.lineWidth = outerBorder;
+    ctx.strokeStyle = "#232323";
     ctx.stroke();
     return;
   }
@@ -316,8 +330,8 @@ function drawWheel() {
 
     if (i === winnerIndex) {
       ctx.save();
-      ctx.shadowColor = "rgba(255,215,0,0.95)";
-      ctx.shadowBlur = 18;
+      ctx.shadowColor = "rgba(255,215,0,0.9)";
+      ctx.shadowBlur = 15;
       ctx.fillStyle = colors[i % colors.length];
       ctx.fill();
       ctx.restore();
@@ -326,35 +340,58 @@ function drawWheel() {
       ctx.fill();
     }
 
-    // label
+    // separator line between sections
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(start) * wheelRadius, cy + Math.sin(start) * wheelRadius);
+    ctx.strokeStyle = "rgba(255,255,255,0.72)";
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    // labels
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(start + arc / 2);
 
     const label = items[i];
-    const maxTextWidth = Math.max(50, wheelRadius * 0.50 * arc * 3.2);
+    const maxTextWidth = Math.max(54, wheelRadius * 0.50 * arc * 3.4);
     const fontSize = fitLabel(label, maxTextWidth, items.length >= 18 ? 13 : 15);
 
     ctx.font = `bold ${fontSize}px Arial`;
-    ctx.fillStyle = "#fff";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.shadowColor = "rgba(0,0,0,0.28)";
+    ctx.translate(wheelRadius - 44, 0);
+    ctx.rotate(Math.PI / 2);
+
+    ctx.strokeStyle = "rgba(0,0,0,0.6)";
+    ctx.lineWidth = 3.4;
+    ctx.strokeText(label, 0, 0);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
     ctx.shadowBlur = 2;
-    ctx.translate(wheelRadius - 42, 0);
-    ctx.rotate(Math.PI / 2);   // keep text following slice better
     ctx.fillText(label, 0, 0);
+
     ctx.restore();
   }
 
-  // outer wheel border
+  // black marker dots
+  for (let i = 0; i < items.length; i++) {
+    const a = rotation + i * arc;
+    const x = cx + Math.cos(a) * dotRingRadius;
+    const y = cy + Math.sin(a) * dotRingRadius;
+    ctx.beginPath();
+    ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+    ctx.fillStyle = "#111";
+    ctx.fill();
+  }
+
+  // outer border
   ctx.beginPath();
   ctx.arc(cx, cy, wheelRadius, 0, Math.PI * 2);
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = "#2a2a2a";
+  ctx.lineWidth = outerBorder;
+  ctx.strokeStyle = "#232323";
   ctx.stroke();
-
-  drawDots(arc);
 
   // center cap
   ctx.beginPath();
@@ -379,13 +416,15 @@ function getWinningIndex() {
   return currentBoundaryIndex();
 }
 
-function flapPointer(intensity = 10, speedMs = 70) {
-  pointerArm.style.transition = `transform ${speedMs}ms ease-out`;
+function flapPointer(intensity = 10, resetMs = 90) {
+  clearTimeout(pointerResetTimer);
+  pointerArm.style.transition = "transform 28ms cubic-bezier(.2,.8,.2,1)";
   pointerArm.style.transform = `translateX(-50%) rotate(${intensity}deg)`;
-  setTimeout(() => {
-    pointerArm.style.transition = `transform ${Math.max(50, speedMs - 10)}ms ease-in`;
+
+  pointerResetTimer = setTimeout(() => {
+    pointerArm.style.transition = `transform ${resetMs}ms cubic-bezier(.12,.8,.25,1)`;
     pointerArm.style.transform = "translateX(-50%) rotate(0deg)";
-  }, speedMs);
+  }, 18);
 }
 
 function maybeTick(progress) {
@@ -393,19 +432,20 @@ function maybeTick(progress) {
   if (idx !== lastBoundaryIndex) {
     lastBoundaryIndex = idx;
 
-    // stronger flap at higher speed, softer near stop
-    const intensity = 5 + (1 - progress) * 9;
-    const speedMs = 45 + progress * 45;
-    flapPointer(intensity, speedMs);
+    const speedFactor = 1 - progress;
+    const intensity = 7 + speedFactor * 10;
+    const resetMs = 60 + progress * 85;
+    flapPointer(intensity, resetMs);
 
-    const vol = 0.025 + (1 - progress) * 0.04;
-    const pitch = 900 + (1 - progress) * 450;
-    playClick(vol, pitch, 0.018 + (1 - progress) * 0.015);
+    const vol = 0.02 + speedFactor * 0.035;
+    const pitch = 850 + speedFactor * 520;
+    const dur = 0.010 + speedFactor * 0.012;
+    playClick(vol, pitch, dur);
   }
 }
 
-function easeOutCubic(t) {
-  return 1 - Math.pow(1 - t, 3);
+function easeOutQuart(t) {
+  return 1 - Math.pow(1 - t, 4);
 }
 
 function spinWheel() {
@@ -422,16 +462,16 @@ function spinWheel() {
   lastBoundaryIndex = -1;
 
   const startRotation = rotation;
-  const extraSpins = 12 + Math.random() * 2.5;
+  const extraSpins = 12 + Math.random() * 2.25;
   const randomStop = Math.random() * Math.PI * 2;
   const targetRotation = startRotation + (Math.PI * 2 * extraSpins) + randomStop;
-  const duration = 8800 + Math.random() * 700;
+  const duration = 8600 + Math.random() * 500;
   const startTime = performance.now();
 
   function animate(now) {
     const elapsed = now - startTime;
     const t = Math.min(elapsed / duration, 1);
-    const eased = easeOutCubic(t);
+    const eased = easeOutQuart(t);
 
     rotation = startRotation + (targetRotation - startRotation) * eased;
     drawWheel();
@@ -440,28 +480,26 @@ function spinWheel() {
     if (t < 1) {
       requestAnimationFrame(animate);
     } else {
-      // subtle settle
       const finalIndex = getWinningIndex();
       const settleStart = rotation;
-      const settle1 = settleStart + 0.05;
-      const settle2 = settleStart - 0.028;
+      const settle1 = settleStart + 0.025;
+      const settle2 = settleStart - 0.012;
       const settle3 = settleStart;
-
-      const settleDuration = 260;
-      const settleTime = performance.now();
+      const settleDuration = 180;
+      const settleStartTime = performance.now();
 
       function settle(now2) {
-        const s = Math.min((now2 - settleTime) / settleDuration, 1);
+        const s = Math.min((now2 - settleStartTime) / settleDuration, 1);
 
-        if (s < 0.33) {
-          const p = s / 0.33;
-          rotation = settleStart + (settle1 - settleStart) * easeOutCubic(p);
-        } else if (s < 0.66) {
-          const p = (s - 0.33) / 0.33;
-          rotation = settle1 + (settle2 - settle1) * easeOutCubic(p);
+        if (s < 0.4) {
+          const p = s / 0.4;
+          rotation = settleStart + (settle1 - settleStart) * easeOutQuart(p);
+        } else if (s < 0.75) {
+          const p = (s - 0.4) / 0.35;
+          rotation = settle1 + (settle2 - settle1) * easeOutQuart(p);
         } else {
-          const p = (s - 0.66) / 0.34;
-          rotation = settle2 + (settle3 - settle2) * easeOutCubic(p);
+          const p = (s - 0.75) / 0.25;
+          rotation = settle2 + (settle3 - settle2) * easeOutQuart(p);
         }
 
         drawWheel();
