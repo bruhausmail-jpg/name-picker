@@ -596,32 +596,32 @@ function runSpin() {
   resetPegTick();
 
   let velocity = 0;
-  const acceleration = 0.25;
-  const deceleration = 0.99;
-  const maxSpeed = 0.22;
-  let spinningTime = 0;
-  const totalSpinTime = 5000 + Math.random() * 1000;
+const acceleration = 0.38 + Math.random() * 0.04;
+const deceleration = 0.992;
+const maxSpeed = 0.32 + Math.random() * 0.04;
+let spinningTime = 0;
+const totalSpinTime = 6500 + Math.random() * 1200;
 
-  function animate() {
-    spinningTime += 16;
+function animate() {
+  spinningTime += 16;
 
-    if (spinningTime < 500) {
-      velocity += acceleration * 0.02;
-      if (velocity > maxSpeed) velocity = maxSpeed;
-    } else {
-      velocity *= deceleration;
-    }
-
-    state.angle += velocity;
-    drawWheel();
-    triggerPegTick(state.angle, names.length, velocity);
-
-    if (spinningTime < totalSpinTime || velocity > 0.002) {
-      requestAnimationFrame(animate);
-    } else {
-      finishSpin();
-    }
+  if (spinningTime < 900) {
+    velocity += acceleration * 0.02;
+    if (velocity > maxSpeed) velocity = maxSpeed;
+  } else {
+    velocity *= deceleration;
   }
+
+  state.angle += velocity;
+  drawWheel();
+  triggerPegTick(state.angle, names.length, velocity);
+
+  if (spinningTime < totalSpinTime || velocity > 0.002) {
+    requestAnimationFrame(animate);
+  } else {
+    finishSpin();
+  }
+}
 
   requestAnimationFrame(animate);
 }
