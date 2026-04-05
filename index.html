@@ -323,43 +323,90 @@ let state = {
   removeWinner: false,
   lastWinner: null,
   history: [],
-  groups: {}
+  groups: {},
+  wheelNames: []
 };
 
 function status(msg) { groupStatus.textContent = msg || ''; }
-function getNames() { return inputs.map(i => i.value.trim()).filter(Boolean); }
+
+function getNames() {
+  return inputs.map(i => i.value.trim()).filter(Boolean);
+}
+
+function shuffleArray(arr) {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function buildWheelNames() {
+  const baseNames = getNames();
+  let expanded = [];
+
+  baseNames.forEach(name => {
+    for (let i = 0; i < 4; i++) {
+      expanded.push(name);
+    }
+  });
+
+  return shuffleArray(expanded);
+}
+
 function saveCurrentNames() { localStorage.setItem(STORAGE_KEYS.names, JSON.stringify(inputs.map(i => i.value))); }
+
 function restoreCurrentNames() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.names) || '[]');
     inputs.forEach((input, i) => input.value = saved[i] || '');
   } catch {}
 }
+
 function escapeHtml(str) {
   return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 }
+
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEYS.settings) || '{}');
-    state.muted = !!s.muted; state.noRepeat = !!s.noRepeat; state.removeWinner = !!s.removeWinner; state.lastWinner = s.lastWinner || null;
+    state.muted = !!s.muted;
+    state.noRepeat = !!s.noRepeat;
+    state.removeWinner = !!s.removeWinner;
+    state.lastWinner = s.lastWinner || null;
   } catch {}
   syncSettingsUI();
 }
+
 function saveSettings() {
   localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify({
-    muted: state.muted, noRepeat: state.noRepeat, removeWinner: state.removeWinner, lastWinner: state.lastWinner
+    muted: state.muted,
+    noRepeat: state.noRepeat,
+    removeWinner: state.removeWinner,
+    lastWinner: state.lastWinner
   }));
 }
+
 function loadHistory() {
-  try { state.history = JSON.parse(localStorage.getItem(STORAGE_KEYS.history) || '[]'); } catch { state.history = []; }
+  try { state.history = JSON.parse(localStorage.getItem(STORAGE_KEYS.history) || '[]'); }
+  catch { state.history = []; }
   renderHistory();
 }
-function saveHistory() { localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(state.history)); }
+
+function saveHistory() {
+  localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(state.history));
+}
+
 function loadGroups() {
-  try { state.groups = JSON.parse(localStorage.getItem(STORAGE_KEYS.groups) || '{}'); } catch { state.groups = {}; }
+  try { state.groups = JSON.parse(localStorage.getItem(STORAGE_KEYS.groups) || '{}'); }
+  catch { state.groups = {}; }
   renderGroups();
 }
-function saveGroups() { localStorage.setItem(STORAGE_KEYS.groups, JSON.stringify(state.groups)); }
+
+function saveGroups() {
+  localStorage.setItem(STORAGE_KEYS.groups, JSON.stringify(state.groups));
+}
 
 function renderHistory() {
   historyList.innerHTML = '';
@@ -370,6 +417,7 @@ function renderHistory() {
     historyList.appendChild(empty);
     return;
   }
+
   state.history.slice().reverse().forEach(item => {
     const row = document.createElement('div');
     row.className = 'list-item';
@@ -381,6 +429,7 @@ function renderHistory() {
 function renderGroups() {
   groupsList.innerHTML = '';
   const entries = Object.entries(state.groups).sort((a,b) => (b[1]?.savedAt || '').localeCompare(a[1]?.savedAt || ''));
+
   if (!entries.length) {
     const empty = document.createElement('div');
     empty.className = 'list-item';
@@ -388,21 +437,32 @@ function renderGroups() {
     groupsList.appendChild(empty);
     return;
   }
+
   entries.forEach(([name, data]) => {
     const row = document.createElement('div');
     row.className = 'list-item';
+
     const left = document.createElement('div');
     left.innerHTML = `<strong>${escapeHtml(name)}</strong><div class="meta">${escapeHtml((data.names || []).join(', '))}</div>`;
+
     const actions = document.createElement('div');
     actions.className = 'group-actions';
+
     const loadBtn = document.createElement('button');
     loadBtn.className = 'mini-btn';
     loadBtn.textContent = 'Load';
     loadBtn.onclick = () => loadGroupByName(name);
+
     const delBtn = document.createElement('button');
     delBtn.className = 'mini-btn';
     delBtn.textContent = 'Delete';
-    delBtn.onclick = () => { delete state.groups[name]; saveGroups(); renderGroups(); status(`Deleted group: ${name}`); };
+    delBtn.onclick = () => {
+      delete state.groups[name];
+      saveGroups();
+      renderGroups();
+      status(`Deleted group: ${name}`);
+    };
+
     actions.appendChild(loadBtn);
     actions.appendChild(delBtn);
     row.appendChild(left);
@@ -420,8 +480,10 @@ function syncSettingsUI() {
 }
 
 function drawWheel() {
-  const names = getNames();
+  const names = state.wheelNames.length ? state.wheelNames : buildWheelNames();
+
   ctx.clearRect(0,0,canvas.width,canvas.height);
+
   if (!names.length) {
     ctx.beginPath();
     ctx.arc(180,180,160,0,Math.PI*2);
@@ -435,7 +497,9 @@ function drawWheel() {
     return;
   }
 
-  const center = 180, radius = 160, slice = (Math.PI * 2) / names.length;
+  const center = 180;
+  const radius = 160;
+  const slice = (Math.PI * 2) / names.length;
   const colors = ['#60a5fa','#5eead4','#f472b6','#f59e0b','#a78bfa','#34d399'];
 
   for (let i = 0; i < names.length; i++) {
@@ -458,9 +522,9 @@ function drawWheel() {
     ctx.textAlign='right';
     ctx.textBaseline='middle';
     ctx.fillStyle='#08111f';
-    ctx.font='700 18px -apple-system, sans-serif';
-    const label = names[i].length > 12 ? names[i].slice(0,12) + '…' : names[i];
-    ctx.fillText(label, radius - 20, 0);
+    ctx.font='700 14px -apple-system, sans-serif';
+    const label = names[i].length > 10 ? names[i].slice(0,10) + '…' : names[i];
+    ctx.fillText(label, radius - 16, 0);
     ctx.restore();
   }
 
@@ -479,7 +543,10 @@ function flashScreen() {
 }
 
 function burstConfetti() {
-  const pieces = [], count = 140, colors = ['#5eead4','#60a5fa','#f472b6','#f59e0b','#ffffff'];
+  const pieces = [];
+  const count = 140;
+  const colors = ['#5eead4','#60a5fa','#f472b6','#f59e0b','#ffffff'];
+
   for (let i = 0; i < count; i++) {
     pieces.push({
       x: window.innerWidth / 2,
@@ -494,22 +561,26 @@ function burstConfetti() {
       life: 60 + Math.random() * 25
     });
   }
+
   const overlay = document.createElement('canvas');
   overlay.width = window.innerWidth * devicePixelRatio;
   overlay.height = window.innerHeight * devicePixelRatio;
   overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:10';
   document.body.appendChild(overlay);
+
   const c = overlay.getContext('2d');
   c.scale(devicePixelRatio, devicePixelRatio);
 
   function frame() {
     c.clearRect(0,0,window.innerWidth,window.innerHeight);
+
     pieces.forEach(p => {
       p.x += p.vx;
       p.y += p.vy;
       p.vy += p.g;
       p.rot += p.vr;
       p.life -= 1;
+
       c.save();
       c.translate(p.x, p.y);
       c.rotate(p.rot);
@@ -517,12 +588,17 @@ function burstConfetti() {
       c.fillRect(-p.size/2, -p.size/2, p.size, p.size*.7);
       c.restore();
     });
+
     for (let i = pieces.length - 1; i >= 0; i--) {
-      if (pieces[i].life <= 0 || pieces[i].y > window.innerHeight + 40) pieces.splice(i, 1);
+      if (pieces[i].life <= 0 || pieces[i].y > window.innerHeight + 40) {
+        pieces.splice(i, 1);
+      }
     }
+
     if (pieces.length) requestAnimationFrame(frame);
     else overlay.remove();
   }
+
   requestAnimationFrame(frame);
 }
 
@@ -535,7 +611,7 @@ function getWinnerIndex(names) {
 }
 
 function finishSpin() {
-  const names = getNames();
+  const names = state.wheelNames;
   if (!names.length) {
     state.spinning = false;
     spinBtn.disabled = false;
@@ -545,9 +621,15 @@ function finishSpin() {
   let winnerIndex = getWinnerIndex(names);
   let winner = names[winnerIndex];
 
-  if (state.noRepeat && names.length > 1 && winner === state.lastWinner) {
-    winnerIndex = (winnerIndex + 1) % names.length;
-    winner = names[winnerIndex];
+  if (state.noRepeat && getNames().length > 1 && winner === state.lastWinner) {
+    for (let i = 1; i < names.length; i++) {
+      const nextIndex = (winnerIndex + i) % names.length;
+      if (names[nextIndex] !== state.lastWinner) {
+        winnerIndex = nextIndex;
+        winner = names[nextIndex];
+        break;
+      }
+    }
   }
 
   state.lastWinner = winner;
@@ -578,6 +660,7 @@ function finishSpin() {
     const found = inputs.find(i => i.value.trim() === winner);
     if (found) found.value = '';
     saveCurrentNames();
+    state.wheelNames = buildWheelNames();
     setTimeout(drawWheel, 10);
   }
 
@@ -586,13 +669,14 @@ function finishSpin() {
 }
 
 function runSpin() {
-  const names = getNames();
-  if (!names.length) {
+  const baseNames = getNames();
+  if (!baseNames.length) {
     state.spinning = false;
     spinBtn.disabled = false;
     return;
   }
 
+  state.wheelNames = buildWheelNames();
   resetPegTick();
 
   let velocity = 0;
@@ -614,7 +698,7 @@ function runSpin() {
 
     state.angle += velocity;
     drawWheel();
-    triggerPegTick(state.angle, names.length, velocity);
+    triggerPegTick(state.angle, state.wheelNames.length, velocity);
 
     if (spinningTime < totalSpinTime || velocity > 0.002) {
       requestAnimationFrame(animate);
@@ -668,15 +752,18 @@ async function startCountdownAndSpin() {
 function saveGroup() {
   const names = getNames();
   const groupName = groupNameInput.value.trim();
+
   if (!names.length) {
     status('Enter some names first.');
     return;
   }
+
   if (!groupName) {
     status('Type a group name first.');
     groupNameInput.focus();
     return;
   }
+
   state.groups[groupName] = { names, savedAt: new Date().toISOString() };
   saveGroups();
   localStorage.setItem(STORAGE_KEYS.latestGroup, groupName);
@@ -691,7 +778,9 @@ function loadGroupByName(name) {
     status('Could not load that group.');
     return;
   }
+
   inputs.forEach((input, i) => input.value = group.names[i] || '');
+  state.wheelNames = [];
   localStorage.setItem(STORAGE_KEYS.latestGroup, name);
   saveCurrentNames();
   drawWheel();
@@ -704,6 +793,7 @@ function loadLatestGroup() {
     loadGroupByName(latest);
     return;
   }
+
   const names = Object.keys(state.groups);
   if (names.length) loadGroupByName(names[0]);
   else status('No saved groups yet.');
@@ -717,32 +807,38 @@ function clearHistory() {
 
 function resetNames() {
   inputs.forEach(i => i.value = '');
+  state.wheelNames = [];
   saveCurrentNames();
   drawWheel();
   status('Cleared names');
 }
 
 inputs.forEach(input => input.addEventListener('input', () => {
+  state.wheelNames = [];
   saveCurrentNames();
   drawWheel();
 }));
 
 spinBtn.addEventListener('click', startCountdownAndSpin);
+
 muteBtn.addEventListener('click', () => {
   state.muted = !state.muted;
   saveSettings();
   syncSettingsUI();
 });
+
 noRepeatBtn.addEventListener('click', () => {
   state.noRepeat = !state.noRepeat;
   saveSettings();
   syncSettingsUI();
 });
+
 removeWinnerBtn.addEventListener('click', () => {
   state.removeWinner = !state.removeWinner;
   saveSettings();
   syncSettingsUI();
 });
+
 saveGroupBtn.addEventListener('click', saveGroup);
 loadLatestBtn.addEventListener('click', loadLatestGroup);
 clearHistoryBtn.addEventListener('click', clearHistory);
