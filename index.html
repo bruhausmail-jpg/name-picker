@@ -12,353 +12,111 @@
       text-align: center;
       color: #222;
     }
-
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-
-    h1 {
-      margin-bottom: 10px;
-    }
-
-    p {
-      margin-top: 0;
-    }
-
-    .controls {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 20px;
-    }
-
-    textarea {
-      width: 320px;
-      height: 140px;
-      padding: 10px;
-      font-size: 16px;
-      border: 1px solid #bbb;
-      border-radius: 8px;
-      resize: vertical;
-    }
-
-    button {
-      padding: 12px 22px;
-      font-size: 16px;
-      border: none;
-      border-radius: 8px;
-      background: #0077cc;
-      color: white;
-      cursor: pointer;
-    }
-
-    button:hover {
-      background: #005fa3;
-    }
-
-    button:disabled {
-      background: #9aa7b3;
-      cursor: not-allowed;
-    }
-
-    .wheel-wrap {
-      position: relative;
-      width: 520px;
-      height: 520px;
-      margin: 0 auto;
-    }
-
-    canvas {
-      background: white;
-      border-radius: 50%;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
-    }
-
+    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    h1 { margin-bottom: 10px; }
+    .controls { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 20px; }
+    textarea { width: 320px; height: 140px; padding: 10px; font-size: 16px; border-radius: 8px; }
+    button { padding: 12px 22px; font-size: 16px; border-radius: 8px; background: #0077cc; color: white; cursor: pointer; }
+    button:hover { background: #005fa3; }
+    .wheel-wrap { position: relative; width: 520px; height: 520px; margin: 0 auto; }
+    canvas { background: white; border-radius: 50%; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15); }
     .pointer {
       position: absolute;
       top: -4px;
       left: 50%;
       transform: translateX(-50%);
-      width: 0;
-      height: 0;
       border-left: 22px solid transparent;
       border-right: 22px solid transparent;
-      border-top: 0;
       border-bottom: 38px solid #d62828;
-      z-index: 10;
     }
-
-    .result {
-      margin-top: 22px;
-      font-size: 24px;
-      font-weight: bold;
-      min-height: 34px;
-    }
-
-    .note {
-      margin-top: 8px;
-      font-size: 14px;
-      color: #555;
-    }
-
-    .small {
-      font-size: 13px;
-      color: #666;
-    }
-
-    @media (max-width: 700px) {
-      .wheel-wrap {
-        width: 340px;
-        height: 340px;
-      }
-
-      canvas {
-        width: 340px !important;
-        height: 340px !important;
-      }
-
-      textarea {
-        width: 90%;
-      }
-    }
+    .result { margin-top: 22px; font-size: 24px; font-weight: bold; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Spin the Wheel</h1>
-    <p>Enter one name per line, then build and spin.</p>
-
     <div class="controls">
       <textarea id="namesInput">Bob
 Sue
 Mike
 Jen</textarea>
-
       <div>
         <button id="buildBtn">Build Wheel</button>
         <button id="spinBtn">Spin</button>
       </div>
-
-      <div class="small">
-        Each name is repeated 4 times on the wheel and shuffled randomly.
-      </div>
     </div>
-
     <div class="wheel-wrap">
       <div class="pointer"></div>
       <canvas id="wheelCanvas" width="500" height="500"></canvas>
     </div>
-
     <div class="result" id="resultText">Winner: —</div>
-    <div class="note" id="statusText"></div>
   </div>
 
-  <script>
-    const canvas = document.getElementById("wheelCanvas");
-    const ctx = canvas.getContext("2d");
+<script>
+const canvas = document.getElementById("wheelCanvas");
+const ctx = canvas.getContext("2d");
+const namesInput = document.getElementById("namesInput");
+const resultText = document.getElementById("resultText");
 
-    const namesInput = document.getElementById("namesInput");
-    const buildBtn = document.getElementById("buildBtn");
-    const spinBtn = document.getElementById("spinBtn");
-    const resultText = document.getElementById("resultText");
-    const statusText = document.getElementById("statusText");
+let wheelItems = [];
+let rotation = 0;
 
-    let wheelItems = [];
-    let rotation = 0;
-    let isSpinning = false;
-    let animationFrame = null;
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
 
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radius = 230;
+function buildWheel(){
+  let names = namesInput.value.split("\n").map(n=>n.trim()).filter(n=>n);
+  let repeated=[];
+  for(let i=0;i<4;i++){ repeated.push(...names); }
+  wheelItems = shuffle(repeated);
+  draw();
+}
 
-    const wheelColors = [
-      "#f94144", "#f3722c", "#f8961e", "#f9844a",
-      "#f9c74f", "#90be6d", "#43aa8b", "#4d908e",
-      "#577590", "#277da1", "#9b5de5", "#ff006e"
-    ];
+function draw(){
+  ctx.clearRect(0,0,500,500);
+  let arc = (Math.PI*2)/wheelItems.length;
+  for(let i=0;i<wheelItems.length;i++){
+    let angle = rotation + i*arc;
+    ctx.beginPath();
+    ctx.moveTo(250,250);
+    ctx.arc(250,250,230,angle,angle+arc);
+    ctx.fillStyle = "hsl("+(i*30)+",80%,60%)";
+    ctx.fill();
+    ctx.save();
+    ctx.translate(250,250);
+    ctx.rotate(angle+arc/2);
+    ctx.fillStyle="#fff";
+    ctx.fillText(wheelItems[i],200,0);
+    ctx.restore();
+  }
+}
 
-    function shuffleArray(array) {
-      const arr = [...array];
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      return arr;
+function spin(){
+  let target = rotation + Math.PI*2*(10+Math.random()*5);
+  let start = performance.now();
+  function anim(t){
+    let p = Math.min((t-start)/6000,1);
+    let eased = 1-Math.pow(1-p,3);
+    rotation = rotation + (target-rotation)*eased;
+    draw();
+    if(p<1){ requestAnimationFrame(anim); }
+    else{
+      let index = Math.floor(((Math.PI*2 - (rotation%(Math.PI*2))) / (Math.PI*2)) * wheelItems.length);
+      resultText.textContent = "Winner: " + wheelItems[index];
     }
+  }
+  requestAnimationFrame(anim);
+}
 
-    function getBaseNames() {
-      return namesInput.value
-        .split("\n")
-        .map(name => name.trim())
-        .filter(name => name.length > 0);
-    }
+document.getElementById("buildBtn").onclick = buildWheel;
+document.getElementById("spinBtn").onclick = spin;
 
-    function buildRepeatedWheel(names) {
-      const repeated = [];
-      for (let i = 0; i < 4; i++) {
-        repeated.push(...names);
-      }
-      return shuffleArray(repeated);
-    }
-
-    function drawWheel() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (wheelItems.length === 0) {
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        ctx.fillStyle = "#e9ecef";
-        ctx.fill();
-        ctx.strokeStyle = "#999";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.fillStyle = "#333";
-        ctx.font = "20px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("Build the wheel first", centerX, centerY);
-        return;
-      }
-
-      const arcSize = (Math.PI * 2) / wheelItems.length;
-
-      for (let i = 0; i < wheelItems.length; i++) {
-        const startAngle = rotation + i * arcSize;
-        const endAngle = startAngle + arcSize;
-
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY);
-        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-        ctx.closePath();
-        ctx.fillStyle = wheelColors[i % wheelColors.length];
-        ctx.fill();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(startAngle + arcSize / 2);
-
-        ctx.textAlign = "right";
-        ctx.fillStyle = "#fff";
-        ctx.font = wheelItems.length > 20 ? "14px Arial" : "16px Arial";
-        ctx.shadowColor = "rgba(0,0,0,0.35)";
-        ctx.shadowBlur = 2;
-
-        const label = wheelItems[i];
-        ctx.fillText(label, radius - 12, 0);
-
-        ctx.restore();
-      }
-
-      // center circle
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 48, 0, Math.PI * 2);
-      ctx.fillStyle = "#ffffff";
-      ctx.fill();
-      ctx.strokeStyle = "#444";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      ctx.fillStyle = "#222";
-      ctx.font = "bold 18px Arial";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("SPIN", centerX, centerY);
-    }
-
-    function getWinningIndex() {
-      const arcSize = (Math.PI * 2) / wheelItems.length;
-
-      // Pointer is at top (-90 degrees)
-      const pointerAngle = -Math.PI / 2;
-
-      let adjusted = (pointerAngle - rotation) % (Math.PI * 2);
-      if (adjusted < 0) adjusted += Math.PI * 2;
-
-      const index = Math.floor(adjusted / arcSize) % wheelItems.length;
-      return index;
-    }
-
-    function easeOutCubic(t) {
-      return 1 - Math.pow(1 - t, 3);
-    }
-
-    function spinWheel() {
-      if (isSpinning || wheelItems.length === 0) return;
-
-      isSpinning = true;
-      spinBtn.disabled = true;
-      buildBtn.disabled = true;
-      resultText.textContent = "Winner: —";
-      statusText.textContent = "Spinning...";
-
-      const currentRotation = rotation;
-
-      // Wheel-of-Fortune-style spin:
-      // several full turns + random stop
-      const extraSpins = 10 + Math.random() * 4; // 10 to 14 full spins
-      const randomOffset = Math.random() * Math.PI * 2;
-      const targetRotation = currentRotation + (extraSpins * Math.PI * 2) + randomOffset;
-
-      const duration = 6500 + Math.random() * 1200; // 6.5 to 7.7 sec
-      const startTime = performance.now();
-
-      function animate(now) {
-        const elapsed = now - startTime;
-        const t = Math.min(elapsed / duration, 1);
-        const eased = easeOutCubic(t);
-
-        rotation = currentRotation + (targetRotation - currentRotation) * eased;
-        drawWheel();
-
-        if (t < 1) {
-          animationFrame = requestAnimationFrame(animate);
-        } else {
-          isSpinning = false;
-          spinBtn.disabled = false;
-          buildBtn.disabled = false;
-
-          const winningIndex = getWinningIndex();
-          const winner = wheelItems[winningIndex];
-
-          resultText.textContent = "Winner: " + winner;
-          statusText.textContent = "Done!";
-        }
-      }
-
-      animationFrame = requestAnimationFrame(animate);
-    }
-
-    function buildWheel() {
-      const baseNames = getBaseNames();
-
-      if (baseNames.length === 0) {
-        wheelItems = [];
-        resultText.textContent = "Winner: —";
-        statusText.textContent = "Please enter at least one name.";
-        drawWheel();
-        return;
-      }
-
-      wheelItems = buildRepeatedWheel(baseNames);
-      rotation = 0;
-      resultText.textContent = "Winner: —";
-      statusText.textContent = `${baseNames.length} unique name(s), ${wheelItems.length} total wheel spaces.`;
-      drawWheel();
-    }
-
-    buildBtn.addEventListener("click", buildWheel);
-    spinBtn.addEventListener("click", spinWheel);
-
-    // Build on first load
-    buildWheel();
-  </script>
+buildWheel();
+</script>
 </body>
 </html>
