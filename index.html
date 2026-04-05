@@ -5,200 +5,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Spin the Wheel</title>
 <style>
-  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f3f3f3;text-align:center;color:#111;}
-  .container{max-width:760px;margin:0 auto;padding:20px 14px 28px;}
-  h1{margin:12px 0 18px;font-size:clamp(30px,6vw,50px);}
-
-  textarea{
-    width:min(92vw,640px);height:130px;padding:12px;border-radius:14px;
-    border:1px solid #ccc;font-size:16px;background:#fff;
+  :root{
+    --bg:#f2f2f2;
+    --text:#111;
+    --blue:#147bd1;
+    --blue-hover:#0f69b4;
+    --wheel-border:#232323;
+    --sep:rgba(255,255,255,0.65);
   }
 
-  .buttons{margin:16px 0;display:flex;justify-content:center;gap:18px;flex-wrap:wrap;}
-  button{
-    border:none;border-radius:14px;background:#147bd1;color:#fff;
-    padding:14px 28px;font-size:16px;cursor:pointer;
+  * { box-sizing: border-box; }
+
+  body{
+    margin:0;
+    font-family: Arial, Helvetica, sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    text-align:center;
   }
 
-  .wheel-wrap{position:relative;width:340px;height:340px;margin:6px auto;}
-  canvas{width:340px;height:340px;}
-
-  /* pointer ABOVE wheel */
-  .pointer{
-    position:absolute;
-    top:-18px; /* sits above wheel */
-    left:50%;
-    transform:translateX(-50%) rotate(0deg);
-    transform-origin:50% 100%;
-    z-index:50;
+  .container{
+    max-width:760px;
+    margin:0 auto;
+    padding:20px 14px 28px;
   }
 
-  .pointer-arm{
-    width:6px;height:60px;background:#c91515;border-radius:6px;
-    transform-origin:50% 100%;
-    transition:transform 0.05s ease;
-  }
-
-  .pointer-tip{
-    width:0;height:0;margin:0 auto;
-    border-left:7px solid transparent;
-    border-right:7px solid transparent;
-    border-bottom:12px solid #c91515;
-  }
-
-  .result{font-size:clamp(28px,6vw,44px);margin-top:16px;}
-</style>
-</head>
-
-<body>
-<div class="container">
-<h1>Spin the Wheel</h1>
-
-<textarea id="names"></textarea>
-
-<div class="buttons">
-<button onclick="build()">Build</button>
-<button onclick="spin()">Spin</button>
-<button onclick="clearNames()">Clear</button>
-</div>
-
-<div class="wheel-wrap">
-<div class="pointer" id="pointer">
-  <div class="pointer-arm" id="arm"></div>
-  <div class="pointer-tip"></div>
-</div>
-<canvas id="c" width="340" height="340"></canvas>
-</div>
-
-<div class="result" id="result">Winner: —</div>
-</div>
-
-<script>
-const c=document.getElementById("c");
-const ctx=c.getContext("2d");
-const input=document.getElementById("names");
-const arm=document.getElementById("arm");
-
-let items=[],rot=0,last=-1;
-
-function save(){localStorage.setItem("wheel_v6",input.value);}
-function load(){input.value=localStorage.getItem("wheel_v6")||"Bob\nSue\nMike\nJen";}
-
-function clearNames(){
-  localStorage.removeItem("wheel_v6");
-  input.value="";items=[];draw();
-}
-
-function shuffle(a){
-  for(let i=a.length-1;i>0;i--){
-    let j=Math.floor(Math.random()*(i+1));
-    [a[i],a[j]]=[a[j],a[i]];
-  }
-  return a;
-}
-
-function build(){
-  save();
-  let base=input.value.split("\n").map(x=>x.trim()).filter(x=>x);
-  let rep=[];
-  for(let i=0;i<3;i++) rep.push(...base);
-  items=shuffle(rep);
-  rot=0;
-  draw();
-}
-
-function draw(){
-  ctx.clearRect(0,0,340,340);
-  if(!items.length) return;
-
-  let arc=Math.PI*2/items.length;
-
-  for(let i=0;i<items.length;i++){
-    let a=rot+i*arc;
-
-    ctx.beginPath();
-    ctx.moveTo(170,170);
-    ctx.arc(170,170,150,a,a+arc);
-    ctx.fillStyle="hsl("+(i*30)+",70%,55%)";
-    ctx.fill();
-
-    // slice separators
-    ctx.strokeStyle="#ffffff";
-    ctx.lineWidth=2;
-    ctx.stroke();
-
-    // text (high contrast)
-    ctx.save();
-    ctx.translate(170,170);
-    ctx.rotate(a+arc/2);
-
-    ctx.font="bold 13px Arial";
-    ctx.textAlign="center";
-    ctx.textBaseline="middle";
-
-    ctx.lineWidth=3;
-    ctx.strokeStyle="#000";
-    ctx.fillStyle="#fff";
-
-    ctx.translate(110,0);
-    ctx.rotate(Math.PI/2);
-
-    ctx.strokeText(items[i],0,0);
-    ctx.fillText(items[i],0,0);
-
-    ctx.restore();
-  }
-
-  // outer border
-  ctx.beginPath();
-  ctx.arc(170,170,150,0,Math.PI*2);
-  ctx.lineWidth=4;
-  ctx.strokeStyle="#222";
-  ctx.stroke();
-}
-
-function flap(){
-  arm.style.transform="rotate(12deg)";
-  setTimeout(()=>arm.style.transform="rotate(0deg)",60);
-}
-
-function spin(){
-  let start=performance.now();
-  let target=rot+Math.PI*2*(12+Math.random()*2);
-
-  function anim(t){
-    let p=Math.min((t-start)/8500,1);
-    let eased=1-Math.pow(1-p,3);
-
-    rot=rot+(target-rot)*eased;
-    draw();
-
-    let arc=Math.PI*2/items.length;
-    let pointer=-Math.PI/2;
-    let adj=(pointer-rot)%(Math.PI*2);
-    if(adj<0) adj+=Math.PI*2;
-    let idx=Math.floor(adj/arc);
-
-    if(idx!==last){
-      last=idx;
-      flap();
-    }
-
-    if(p<1){
-      requestAnimationFrame(anim);
-    }else{
-      document.getElementById("result").textContent="Winner: "+items[idx];
-    }
-  }
-
-  requestAnimationFrame(anim);
-}
-
-load();
-build();
-</script>
-</body>
-</html>
+  h1{
+    margin:12px 0 18px;
+    font-size:clamp(30px,6vw,50px);
+    font-weight:700;
   }
 
   textarea{
