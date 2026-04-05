@@ -11,7 +11,6 @@
     --blue:#147bd1;
     --blue-hover:#0f69b4;
     --wheel-border:#232323;
-    --sep:rgba(255,255,255,0.65);
   }
 
   * { box-sizing: border-box; }
@@ -73,7 +72,7 @@
   .wheel-wrap{
     position:relative;
     width:340px;
-    height:350px;
+    height:378px;
     margin:4px auto 8px;
     overflow:visible;
   }
@@ -82,15 +81,15 @@
     width:340px;
     height:340px;
     display:block;
-    margin-top:10px;
+    margin-top:38px;
   }
 
   .pointer{
     position:absolute;
-    top:-4px;
+    top:-6px;
     left:50%;
     width:20px;
-    height:76px;
+    height:58px;
     transform:translateX(-50%);
     z-index:50;
     pointer-events:none;
@@ -114,7 +113,7 @@
     top:4px;
     left:50%;
     width:7px;
-    height:60px;
+    height:40px;
     background:#c61e1e;
     border-radius:7px;
     transform:translateX(-50%) rotate(0deg);
@@ -124,7 +123,7 @@
 
   .pointer-tip{
     position:absolute;
-    bottom:-11px;
+    bottom:-6px;
     left:50%;
     width:0;
     height:0;
@@ -184,10 +183,10 @@ const clearBtn = document.getElementById("clearBtn");
 const resultText = document.getElementById("resultText");
 const pointerArm = document.getElementById("pointerArm");
 
-const STORAGE_KEY = "spinWheelPremium_v1";
+const STORAGE_KEY = "spinWheelPremium_v5";
 
 const cx = 170;
-const cy = 180;
+const cy = 190;
 const wheelRadius = 148;
 const outerBorder = 5;
 const dotRingRadius = 145;
@@ -270,8 +269,9 @@ function shuffleArray(arr) {
 
 function buildWheel() {
   saveNames();
+
   const baseNames = namesInput.value
-    .split("\\n")
+    .split("\n")
     .map(n => n.trim())
     .filter(Boolean);
 
@@ -340,7 +340,6 @@ function drawWheel() {
       ctx.fill();
     }
 
-    // separator line between sections
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.cos(start) * wheelRadius, cy + Math.sin(start) * wheelRadius);
@@ -348,23 +347,22 @@ function drawWheel() {
     ctx.lineWidth = 1.8;
     ctx.stroke();
 
-    // labels
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(start + arc / 2);
 
     const label = items[i];
     const maxTextWidth = Math.max(54, wheelRadius * 0.50 * arc * 3.4);
-    const fontSize = fitLabel(label, maxTextWidth, items.length >= 18 ? 13 : 15);
+    const fontSize = fitLabel(label, maxTextWidth, items.length >= 18 ? 12 : 13);
 
     ctx.font = `bold ${fontSize}px Arial`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.translate(wheelRadius - 44, 0);
+    ctx.translate(wheelRadius - 28, 0);
     ctx.rotate(Math.PI / 2);
 
     ctx.strokeStyle = "rgba(0,0,0,0.6)";
-    ctx.lineWidth = 3.4;
+    ctx.lineWidth = 3.2;
     ctx.strokeText(label, 0, 0);
 
     ctx.fillStyle = "#ffffff";
@@ -375,7 +373,6 @@ function drawWheel() {
     ctx.restore();
   }
 
-  // black marker dots
   for (let i = 0; i < items.length; i++) {
     const a = rotation + i * arc;
     const x = cx + Math.cos(a) * dotRingRadius;
@@ -386,14 +383,12 @@ function drawWheel() {
     ctx.fill();
   }
 
-  // outer border
   ctx.beginPath();
   ctx.arc(cx, cy, wheelRadius, 0, Math.PI * 2);
   ctx.lineWidth = outerBorder;
   ctx.strokeStyle = "#232323";
   ctx.stroke();
 
-  // center cap
   ctx.beginPath();
   ctx.arc(cx, cy, centerRadius, 0, Math.PI * 2);
   ctx.fillStyle = "#fff";
