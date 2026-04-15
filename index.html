@@ -406,6 +406,1091 @@
     <section class="screen" id="azulScreen">
       <div class="azul-wrap card">
         <h2>Azul Score Tracker</h2>
+        <p class="azul-intro">Enter the running total after each round. The top score cards will show each player's latest total.</p>
+
+        <div id="setupArea">
+          <div class="setup-row">
+            <label for="playerCount">Number of players</label>
+            <select id="playerCount">
+              <option value="2">2 Players</option>
+              <option value="3">3 Players</option>
+              <option value="4" selected>4 Players</option>
+            </select>
+          </div>
+
+          <div class="setup-grid">
+            <div class="player-inputs" id="playerInputs"></div>
+          </div>
+
+          <div class="buttons">
+            <button id="startGameBtn" class="btn-green" type="button">Start Game</button>
+            <button id="loadWheelNamesBtn" class="btn-gold" type="button">Use Wheel Names</button>
+          </div>
+        </div>
+
+        <div class="tracker-area" id="trackerArea">
+          <div class="winner-banner" id="leaderText">Leader: —</div>
+
+          <div class="totals-grid" id="totalsGrid"></div>
+
+          <div class="score-actions">
+            <button id="addRoundBtn" class="btn-green" type="button">Add Round</button>
+            <button id="newGameBtn" class="btn-gold" type="button">New Game Setup</button>
+            <button id="resetScoresBtn" class="btn-danger" type="button">Reset Scores</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr id="scoreHeadRow"></tr>
+              </thead>
+              <tbody id="scoreBody"></tbody>
+            </table>
+          </div>
+
+          <div class="small-note">Azul game data saves automatically on this device.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+const canvas = document.getElementById("wheel");
+const ctx = canvas.getContext("2d");
+const namesInput = document.getElementById("namesInput");
+const buildBtn = document.getElementById("buildBtn");
+const spinBtn = document.getElementById("spinBtn");
+const clearBtn = document.getElementById("clearBtn");
+const resultText = document.getElementById("resultText");
+const pointerArm = document.getElementById("pointerArm");
+
+const wheelScreen = document.getElementById("wheelScreen");
+const azulScreen = document.getElementById("azulScreen");
+const wheelTabBtn = document.getElementById("wheelTabBtn");
+const azulTabBtn = document.getElementById("azulTabBtn");
+
+const playerCount = document.getElementById("playerCount");
+const playerInputs = document.getElementById("playerInputs");
+const startGameBtn = document.getElementById("startGameBtn");
+const loadWheelNamesBtn = document.getElementById("loadWheelNamesBtn");
+const setupArea = document.getElementById("setupArea");
+const trackerArea = document.getElementById("trackerArea");
+const leaderText = document.getElementById("leaderText");
+const totalsGrid = document.getElementById("totalsGrid");
+const scoreHeadRow = document.getElementById("scoreHeadRow");
+const scoreBody = document.getElementById("scoreBody");
+const addRoundBtn = document.getElementById("addRoundBtn");
+const newGameBtn = document.getElementById("newGameBtn");
+const resetScoresBtn = document.getElementById("resetScoresBtn");
+
+const STORAGE_KEY = "spinWheelPremium_v5";
+const AZUL_STORAGE_KEY = "azulTracker_v2";
+const SCREEN_STORAGE_KEY = "gameNightHelper_activeScreen";
+
+const cx = 170;
+const cy = 190;
+const wheelRadius = 148;
+const outerBorder = 5;
+const dotRingRadius = 145;
+const dotRadius = 3.4;
+const centerRadius = 18;
+
+let items = [];
+let rotation = 0;
+let isSpinning = false;
+let winnerIndex = -1;
+let lastBoundaryIndex = -1;
+let audioCtx = null;
+let pointerResetTimer = null;
+
+let azulState = {
+  playerCount: 4,
+  players: ["Bob", "Sue", "Mike", "Jen"],
+  rounds: [],
+  started: false
+};
+
+const colors = [
+  "#b84d4d", "#c37f4a", "#b6a94c", "#879f4c",
+  "#4e9352", "#4d8f7b", "#4b8f99", "#4c78a8",
+  "#5a5fb3", "#7c60a9", "#a05d9a", "#ae5c7b"
+];
+
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function playClick(volume = 0.03, pitch = 1000, dur = 0.015) {
+  if (!audioCtx) return;
+
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+
+  osc.type = "triangle";
+  osc.frequency.setValueAtTime(pitch, now);
+
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(1300, now);
+  filter.Q.value = 2.5;
+
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.0015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc.start(now);
+  osc.stop(now + dur + 0.004);
+}
+
+function saveNames() {
+  localStorage.setItem(STORAGE_KEY, namesInput.value);
+}
+
+function loadNames() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  namesInput.value = saved && saved.trim() ? saved : "Bob\nSue\nMike\nJen";
+}
+
+function clearNames() {
+  localStorage.removeItem(STORAGE_KEY);
+  namesInput.value = "";
+  items = [];
+  winnerIndex = -1;
+  rotation = 0;
+  resultText.textContent = "Winner: —";
+  drawWheel();
+}
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildWheel() {
+  saveNames();
+
+  const baseNames = namesInput.value
+    .split("\n")
+    .map(n => n.trim())
+    .filter(Boolean);
+
+  if (!baseNames.length) {
+    items = [];
+    winnerIndex = -1;
+    resultText.textContent = "Winner: —";
+    drawWheel();
+    return;
+  }
+
+  const repeated = [];
+  for (let i = 0; i < 3; i++) repeated.push(...baseNames);
+
+  items = shuffleArray(repeated);
+  rotation = 0;
+  winnerIndex = -1;
+  resultText.textContent = "Winner: —";
+  drawWheel();
+}
+
+function fitLabel(text, maxWidth, baseFontPx) {
+  let fontSize = baseFontPx;
+  while (fontSize > 10) {
+    ctx.font = `bold ${fontSize}px Arial`;
+    if (ctx.measureText(text).width <= maxWidth) return fontSize;
+    fontSize -= 1;
+  }
+  return 10;
+}
+
+function drawWheel() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!items.length) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, wheelRadius, 0, Math.PI * 2);
+    ctx.fillStyle = "#e4e4e4";
+    ctx.fill();
+    ctx.lineWidth = outerBorder;
+    ctx.strokeStyle = "#232323";
+    ctx.stroke();
+    return;
+  }
+
+  const arc = (Math.PI * 2) / items.length;
+
+  for (let i = 0; i < items.length; i++) {
+    const start = rotation + i * arc;
+    const end = start + arc;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, wheelRadius, start, end);
+    ctx.closePath();
+
+    if (i === winnerIndex) {
+      ctx.save();
+      ctx.shadowColor = "rgba(255,215,0,0.9)";
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(start) * wheelRadius, cy + Math.sin(start) * wheelRadius);
+    ctx.strokeStyle = "rgba(255,255,255,0.72)";
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(start + arc / 2);
+
+    const label = items[i];
+    const maxTextWidth = Math.max(54, wheelRadius * 0.50 * arc * 3.4);
+    const fontSize = fitLabel(label, maxTextWidth, items.length >= 18 ? 12 : 13);
+
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.translate(wheelRadius - 28, 0);
+    ctx.rotate(Math.PI / 2);
+
+    ctx.strokeStyle = "rgba(0,0,0,0.6)";
+    ctx.lineWidth = 3.2;
+    ctx.strokeText(label, 0, 0);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(0,0,0,0.25)";
+    ctx.shadowBlur = 2;
+    ctx.fillText(label, 0, 0);
+
+    ctx.restore();
+  }
+
+  for (let i = 0; i < items.length; i++) {
+    const a = rotation + i * arc;
+    const x = cx + Math.cos(a) * dotRingRadius;
+    const y = cy + Math.sin(a) * dotRingRadius;
+    ctx.beginPath();
+    ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+    ctx.fillStyle = "#111";
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, wheelRadius, 0, Math.PI * 2);
+  ctx.lineWidth = outerBorder;
+  ctx.strokeStyle = "#232323";
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, centerRadius, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#555";
+  ctx.stroke();
+}
+
+function currentBoundaryIndex() {
+  if (!items.length) return -1;
+  const arc = (Math.PI * 2) / items.length;
+  const pointerAngle = -Math.PI / 2;
+  let adjusted = (pointerAngle - rotation) % (Math.PI * 2);
+  if (adjusted < 0) adjusted += Math.PI * 2;
+  return Math.floor(adjusted / arc) % items.length;
+}
+
+function getWinningIndex() {
+  return currentBoundaryIndex();
+}
+
+function flapPointer(intensity = 10, resetMs = 90) {
+  clearTimeout(pointerResetTimer);
+  pointerArm.style.transition = "transform 28ms cubic-bezier(.2,.8,.2,1)";
+  pointerArm.style.transform = `translateX(-50%) rotate(${intensity}deg)`;
+
+  pointerResetTimer = setTimeout(() => {
+    pointerArm.style.transition = `transform ${resetMs}ms cubic-bezier(.12,.8,.25,1)`;
+    pointerArm.style.transform = "translateX(-50%) rotate(0deg)";
+  }, 18);
+}
+
+function maybeTick(progress) {
+  const idx = currentBoundaryIndex();
+  if (idx !== lastBoundaryIndex) {
+    lastBoundaryIndex = idx;
+
+    const speedFactor = 1 - progress;
+    const intensity = 7 + speedFactor * 10;
+    const resetMs = 60 + progress * 85;
+    flapPointer(intensity, resetMs);
+
+    const vol = 0.02 + speedFactor * 0.035;
+    const pitch = 850 + speedFactor * 520;
+    const dur = 0.010 + speedFactor * 0.012;
+    playClick(vol, pitch, dur);
+  }
+}
+
+function easeOutQuart(t) {
+  return 1 - Math.pow(1 - t, 4);
+}
+
+function spinWheel() {
+  if (isSpinning || !items.length) return;
+
+  ensureAudio();
+
+  isSpinning = true;
+  winnerIndex = -1;
+  resultText.textContent = "Winner: —";
+  spinBtn.disabled = true;
+  buildBtn.disabled = true;
+  clearBtn.disabled = true;
+  lastBoundaryIndex = -1;
+
+  const startRotation = rotation;
+  const extraSpins = 12 + Math.random() * 2.25;
+  const randomStop = Math.random() * Math.PI * 2;
+  const targetRotation = startRotation + (Math.PI * 2 * extraSpins) + randomStop;
+  const duration = 8600 + Math.random() * 500;
+  const startTime = performance.now();
+
+  function animate(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed / duration, 1);
+    const eased = easeOutQuart(t);
+
+    rotation = startRotation + (targetRotation - startRotation) * eased;
+    drawWheel();
+    maybeTick(t);
+
+    if (t < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      const finalIndex = getWinningIndex();
+      const settleStart = rotation;
+      const settle1 = settleStart + 0.025;
+      const settle2 = settleStart - 0.012;
+      const settle3 = settleStart;
+      const settleDuration = 180;
+      const settleStartTime = performance.now();
+
+      function settle(now2) {
+        const s = Math.min((now2 - settleStartTime) / settleDuration, 1);
+
+        if (s < 0.4) {
+          const p = s / 0.4;
+          rotation = settleStart + (settle1 - settleStart) * easeOutQuart(p);
+        } else if (s < 0.75) {
+          const p = (s - 0.4) / 0.35;
+          rotation = settle1 + (settle2 - settle1) * easeOutQuart(p);
+        } else {
+          const p = (s - 0.75) / 0.25;
+          rotation = settle2 + (settle3 - settle2) * easeOutQuart(p);
+        }
+
+        drawWheel();
+
+        if (s < 1) {
+          requestAnimationFrame(settle);
+        } else {
+          winnerIndex = finalIndex;
+          drawWheel();
+          resultText.textContent = finalIndex >= 0 ? "Winner: " + items[finalIndex] : "Winner: —";
+          isSpinning = false;
+          spinBtn.disabled = false;
+          buildBtn.disabled = false;
+          clearBtn.disabled = false;
+        }
+      }
+
+      requestAnimationFrame(settle);
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+function saveAzulState() {
+  const payload = {
+    ...azulState,
+    playerCount: Number(azulState.playerCount),
+    players: [...azulState.players],
+    rounds: azulState.rounds.map(round => [...round])
+  };
+  localStorage.setItem(AZUL_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function loadAzulState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(AZUL_STORAGE_KEY) || "null");
+    if (!saved) return;
+
+    const count = Math.min(4, Math.max(2, Number(saved.playerCount) || 4));
+    const players = Array.isArray(saved.players) ? saved.players.slice(0, count) : [];
+    while (players.length < count) {
+      players.push(`Player ${players.length + 1}`);
+    }
+
+    const rounds = Array.isArray(saved.rounds)
+      ? saved.rounds.map(round => {
+          const clean = Array.isArray(round) ? round.slice(0, count) : [];
+          while (clean.length < count) clean.push(0);
+          return clean.map(v => Number(v) || 0);
+        })
+      : [];
+
+    azulState = {
+      playerCount: count,
+      players,
+      rounds,
+      started: Boolean(saved.started)
+    };
+  } catch (err) {
+    console.warn("Could not load Azul tracker state.", err);
+  }
+}
+
+function setActiveScreen(screen) {
+  const isWheel = screen === "wheel";
+
+  wheelScreen.classList.toggle("active", isWheel);
+  azulScreen.classList.toggle("active", !isWheel);
+  wheelTabBtn.classList.toggle("active", isWheel);
+  azulTabBtn.classList.toggle("active", !isWheel);
+
+  localStorage.setItem(SCREEN_STORAGE_KEY, isWheel ? "wheel" : "azul");
+}
+
+function buildPlayerInputs() {
+  const count = Number(playerCount.value);
+  const existing = Array.isArray(azulState.players) ? azulState.players : [];
+  playerInputs.innerHTML = "";
+
+  for (let i = 0; i < count; i++) {
+    const wrap = document.createElement("div");
+    wrap.className = "player-input";
+
+    const label = document.createElement("label");
+    label.setAttribute("for", `playerName${i}`);
+    label.textContent = `Player ${i + 1}`;
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.id = `playerName${i}`;
+    input.maxLength = 20;
+    input.placeholder = `Player ${i + 1}`;
+    input.value = existing[i] || `Player ${i + 1}`;
+
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+    playerInputs.appendChild(wrap);
+  }
+}
+
+function getPlayerNamesFromInputs() {
+  const inputs = [...playerInputs.querySelectorAll("input")];
+  return inputs.map((input, index) => {
+    const name = input.value.trim();
+    return name || `Player ${index + 1}`;
+  });
+}
+
+function getWheelBaseNames() {
+  return namesInput.value
+    .split("\n")
+    .map(n => n.trim())
+    .filter(Boolean);
+}
+
+function loadWheelNamesIntoTracker() {
+  const wheelNames = getWheelBaseNames().slice(0, 4);
+  if (wheelNames.length < 2) {
+    alert("Add at least 2 names in the Wheel Picker first.");
+    return;
+  }
+
+  playerCount.value = String(Math.min(4, Math.max(2, wheelNames.length)));
+  azulState.players = [...wheelNames];
+  azulState.playerCount = Number(playerCount.value);
+  buildPlayerInputs();
+
+  [...playerInputs.querySelectorAll("input")].forEach((input, index) => {
+    input.value = wheelNames[index] || `Player ${index + 1}`;
+  });
+}
+
+function startAzulGame() {
+  const count = Number(playerCount.value);
+  const players = getPlayerNamesFromInputs().slice(0, count);
+
+  azulState = {
+    playerCount: count,
+    players,
+    rounds: azulState.started && azulState.players.join("|") === players.join("|") && azulState.playerCount === count
+      ? azulState.rounds
+      : [],
+    started: true
+  };
+
+  if (!azulState.rounds.length) {
+    azulState.rounds.push(new Array(count).fill(0));
+  }
+
+  saveAzulState();
+  renderAzulTracker();
+}
+
+function newAzulGameSetup() {
+  azulState.started = false;
+  saveAzulState();
+  renderAzulTracker();
+}
+
+function resetAzulScores() {
+  if (!azulState.started) return;
+  azulState.rounds = [new Array(azulState.playerCount).fill(0)];
+  saveAzulState();
+  renderAzulTracker();
+}
+
+function addRound() {
+  if (!azulState.started) return;
+
+  const newRound = new Array(azulState.playerCount).fill(0);
+
+  if (azulState.rounds.length) {
+    const lastRound = azulState.rounds[azulState.rounds.length - 1];
+    for (let i = 0; i < azulState.playerCount; i++) {
+      newRound[i] = Number(lastRound[i]) || 0;
+    }
+  }
+
+  azulState.rounds.push(newRound);
+  saveAzulState();
+  renderAzulTracker();
+}
+
+function updateRoundScore(roundIndex, playerIndex, value) {
+  if (!azulState.rounds[roundIndex]) return;
+  const num = Number(value);
+  azulState.rounds[roundIndex][playerIndex] = Number.isFinite(num) ? num : 0;
+  saveAzulState();
+  renderTotalsOnly();
+}
+
+function calculateTotals() {
+  if (!azulState.rounds.length) {
+    return azulState.players.map(() => 0);
+  }
+
+  const lastRound = azulState.rounds[azulState.rounds.length - 1];
+  return azulState.players.map((_, playerIndex) => Number(lastRound[playerIndex]) || 0);
+}
+
+function getLeaderText(totals) {
+  if (!totals.length) return "Leader: —";
+  const best = Math.max(...totals);
+  const leaders = azulState.players.filter((_, index) => totals[index] === best);
+  if (leaders.length === 1) return `Leader: ${leaders[0]} (${best})`;
+  return `Tie: ${leaders.join(", ")} (${best})`;
+}
+
+function renderTotalsOnly() {
+  const totals = calculateTotals();
+  leaderText.textContent = getLeaderText(totals);
+  totalsGrid.innerHTML = "";
+
+  const best = totals.length ? Math.max(...totals) : null;
+
+  azulState.players.forEach((name, index) => {
+    const card = document.createElement("div");
+    card.className = "total-card";
+    if (best !== null && totals[index] === best) card.classList.add("leader");
+
+    const nameDiv = document.createElement("div");
+    nameDiv.className = "name";
+    nameDiv.textContent = name;
+
+    const scoreDiv = document.createElement("div");
+    scoreDiv.className = "score";
+    scoreDiv.textContent = totals[index];
+
+    card.appendChild(nameDiv);
+    card.appendChild(scoreDiv);
+    totalsGrid.appendChild(card);
+  });
+}
+
+function renderScoreTable() {
+  scoreHeadRow.innerHTML = "";
+  scoreBody.innerHTML = "";
+
+  const roundHead = document.createElement("th");
+  roundHead.textContent = "Round";
+  scoreHeadRow.appendChild(roundHead);
+
+  azulState.players.forEach(name => {
+    const th = document.createElement("th");
+    th.textContent = name;
+    scoreHeadRow.appendChild(th);
+  });
+
+  azulState.rounds.forEach((round, roundIndex) => {
+    const tr = document.createElement("tr");
+
+    const roundTd = document.createElement("td");
+    roundTd.className = "round-label";
+    roundTd.textContent = `Round ${roundIndex + 1}`;
+    tr.appendChild(roundTd);
+
+    round.forEach((score, playerIndex) => {
+      const td = document.createElement("td");
+
+      const input = document.createElement("input");
+      input.type = "number";
+      input.className = "round-input";
+      input.value = score;
+      input.step = "1";
+      input.addEventListener("input", (e) => {
+        updateRoundScore(roundIndex, playerIndex, e.target.value);
+      });
+
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+
+    scoreBody.appendChild(tr);
+  });
+}
+
+function renderAzulTracker() {
+  playerCount.value = String(azulState.playerCount);
+  buildPlayerInputs();
+
+  [...playerInputs.querySelectorAll("input")].forEach((input, index) => {
+    input.value = azulState.players[index] || `Player ${index + 1}`;
+  });
+
+  setupArea.classList.toggle("hidden", azulState.started);
+  trackerArea.classList.toggle("active", azulState.started);
+
+  if (!azulState.started) return;
+
+  renderTotalsOnly();
+  renderScoreTable();
+}
+
+namesInput.addEventListener("input", saveNames);
+buildBtn.addEventListener("click", buildWheel);
+spinBtn.addEventListener("click", spinWheel);
+clearBtn.addEventListener("click", clearNames);
+
+wheelTabBtn.addEventListener("click", () => setActiveScreen("wheel"));
+azulTabBtn.addEventListener("click", () => setActiveScreen("azul"));
+playerCount.addEventListener("change", buildPlayerInputs);
+startGameBtn.addEventListener("click", startAzulGame);
+loadWheelNamesBtn.addEventListener("click", loadWheelNamesIntoTracker);
+addRoundBtn.addEventListener("click", addRound);
+newGameBtn.addEventListener("click", newAzulGameSetup);
+resetScoresBtn.addEventListener("click", resetAzulScores);
+
+loadNames();
+buildWheel();
+loadAzulState();
+renderAzulTracker();
+setActiveScreen(localStorage.getItem(SCREEN_STORAGE_KEY) === "azul" ? "azul" : "wheel");
+</script>
+</body>
+</html>    margin:0 auto;
+    padding:20px 14px 32px;
+  }
+
+  h1{
+    margin:12px 0 18px;
+    font-size:clamp(30px,6vw,50px);
+    font-weight:700;
+  }
+
+  h2{
+    margin:0 0 10px;
+    font-size:clamp(24px,4vw,34px);
+  }
+
+  .top-tabs{
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin:2px 0 18px;
+  }
+
+  .tab-btn{
+    border:none;
+    border-radius:16px;
+    background:#d9e8f7;
+    color:#0f3b63;
+    padding:12px 22px;
+    font-size:16px;
+    min-width:155px;
+    cursor:pointer;
+    font-weight:700;
+  }
+
+  .tab-btn.active{
+    background:var(--blue);
+    color:#fff;
+  }
+
+  .screen{ display:none; }
+  .screen.active{ display:block; }
+
+  .card{
+    background:var(--card);
+    border:1px solid #e3e3e3;
+    border-radius:20px;
+    padding:18px 14px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  textarea{
+    width:min(92vw,640px);
+    height:130px;
+    padding:12px 14px;
+    border:1px solid #d1d1d1;
+    border-radius:14px;
+    resize:vertical;
+    font-size:16px;
+    font-family:Arial, Helvetica, sans-serif;
+    background:#fff;
+  }
+
+  .buttons{
+    margin:16px 0 14px;
+    display:flex;
+    justify-content:center;
+    gap:18px;
+    flex-wrap:wrap;
+  }
+
+  button{
+    border:none;
+    border-radius:14px;
+    background:var(--blue);
+    color:#fff;
+    padding:14px 28px;
+    font-size:16px;
+    min-width:118px;
+    cursor:pointer;
+  }
+
+  button:hover{ background:var(--blue-hover); }
+  button:disabled{ background:#8eb6d9; cursor:not-allowed; }
+
+  .btn-gold{ background:var(--gold); color:#fff; }
+  .btn-gold:hover{ background:var(--gold-hover); }
+
+  .btn-danger{ background:var(--danger); color:#fff; }
+  .btn-danger:hover{ background:var(--danger-hover); }
+
+  .btn-green{ background:var(--green); color:#fff; }
+  .btn-green:hover{ background:var(--green-hover); }
+
+  .wheel-wrap{
+    position:relative;
+    width:340px;
+    height:378px;
+    margin:4px auto 8px;
+    overflow:visible;
+  }
+
+  canvas{
+    width:340px;
+    height:340px;
+    display:block;
+    margin-top:38px;
+  }
+
+  .pointer{
+    position:absolute;
+    top:-6px;
+    left:50%;
+    width:20px;
+    height:58px;
+    transform:translateX(-50%);
+    z-index:50;
+    pointer-events:none;
+  }
+
+  .pointer-pivot{
+    position:absolute;
+    top:0;
+    left:50%;
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:#262626;
+    transform:translateX(-50%);
+    z-index:3;
+    box-shadow:0 1px 2px rgba(0,0,0,0.25);
+  }
+
+  .pointer-arm{
+    position:absolute;
+    top:4px;
+    left:50%;
+    width:7px;
+    height:40px;
+    background:#c61e1e;
+    border-radius:7px;
+    transform:translateX(-50%) rotate(0deg);
+    transform-origin:50% 4px;
+    box-shadow:0 2px 4px rgba(0,0,0,0.18);
+  }
+
+  .pointer-tip{
+    position:absolute;
+    bottom:-6px;
+    left:50%;
+    width:0;
+    height:0;
+    transform:translateX(-50%);
+    border-left:8px solid transparent;
+    border-right:8px solid transparent;
+    border-top:16px solid #c61e1e;
+  }
+
+  .result{
+    font-size:clamp(28px,6vw,44px);
+    margin-top:16px;
+    min-height:52px;
+    font-weight:500;
+  }
+
+  .small-note{
+    font-size:13px;
+    color:#666;
+    margin-top:4px;
+  }
+
+  .azul-wrap{
+    max-width:760px;
+    margin:0 auto;
+  }
+
+  .azul-intro{
+    color:var(--muted);
+    margin:0 0 18px;
+    font-size:15px;
+  }
+
+  .setup-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:14px;
+    margin-top:14px;
+  }
+
+  .setup-row{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .setup-row label{
+    font-weight:700;
+  }
+
+  select, input[type="text"], input[type="number"]{
+    border:1px solid #cfcfcf;
+    border-radius:12px;
+    padding:11px 12px;
+    font-size:16px;
+    background:#fff;
+  }
+
+  .player-inputs{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+    gap:12px;
+    margin-top:6px;
+  }
+
+  .player-input{
+    display:flex;
+    flex-direction:column;
+    text-align:left;
+    gap:6px;
+  }
+
+  .player-input label{
+    font-weight:700;
+    color:#333;
+  }
+
+  .tracker-area{
+    margin-top:18px;
+    display:none;
+  }
+
+  .tracker-area.active{
+    display:block;
+  }
+
+  .score-actions{
+    display:flex;
+    justify-content:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin:14px 0 16px;
+  }
+
+  .totals-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+    gap:12px;
+    margin:0 0 16px;
+  }
+
+  .total-card{
+    background:#fafafa;
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:14px 10px;
+  }
+
+  .total-card .name{
+    font-weight:700;
+    margin-bottom:6px;
+  }
+
+  .total-card .score{
+    font-size:28px;
+    font-weight:700;
+  }
+
+  .leader{
+    border-color:#e3c56c;
+    background:#fffaf0;
+  }
+
+  .table-wrap{
+    overflow-x:auto;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:8px;
+  }
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:520px;
+  }
+
+  th, td{
+    border-bottom:1px solid #ebebeb;
+    padding:10px 8px;
+    text-align:center;
+  }
+
+  th{
+    background:#fafafa;
+    font-size:15px;
+  }
+
+  tr:last-child td{ border-bottom:none; }
+
+  .round-label{
+    font-weight:700;
+    min-width:88px;
+  }
+
+  .round-input{
+    width:96px;
+    text-align:center;
+    padding:10px 8px;
+  }
+
+  .winner-banner{
+    margin:0 0 16px;
+    font-size:22px;
+    font-weight:700;
+    min-height:28px;
+  }
+
+  .hidden{ display:none !important; }
+
+  @media (max-width: 540px){
+    button, .tab-btn{
+      width:100%;
+      max-width:340px;
+    }
+
+    .setup-row{
+      flex-direction:column;
+    }
+
+    .round-input{
+      width:80px;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Game Night Helper</h1>
+
+    <div class="top-tabs">
+      <button class="tab-btn active" id="wheelTabBtn" type="button">Wheel Picker</button>
+      <button class="tab-btn" id="azulTabBtn" type="button">Azul Tracker</button>
+    </div>
+
+    <section class="screen active" id="wheelScreen">
+      <textarea id="namesInput"></textarea>
+
+      <div class="buttons">
+        <button id="buildBtn">Build</button>
+        <button id="spinBtn">Spin</button>
+        <button id="clearBtn">Clear</button>
+      </div>
+
+      <div class="wheel-wrap">
+        <div class="pointer">
+          <div class="pointer-pivot"></div>
+          <div class="pointer-arm" id="pointerArm">
+            <div class="pointer-tip"></div>
+          </div>
+        </div>
+        <canvas id="wheel" width="340" height="340"></canvas>
+      </div>
+
+      <div class="result" id="resultText">Winner: —</div>
+      <div class="small-note">Names save automatically on this device.</div>
+    </section>
+
+    <section class="screen" id="azulScreen">
+      <div class="azul-wrap card">
+        <h2>Azul Score Tracker</h2>
         <p class="azul-intro">Enter each round as the running total, and the latest totals will update automatically.</p>
 
         <div id="setupArea">
