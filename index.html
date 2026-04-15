@@ -406,7 +406,7 @@
     <section class="screen" id="azulScreen">
       <div class="azul-wrap card">
         <h2>Azul Score Tracker</h2>
-        <p class="azul-intro">Set up your players, enter each round manually, and the totals will update automatically.</p>
+        <p class="azul-intro">Enter each round as the running total, and the latest totals will update automatically.</p>
 
         <div id="setupArea">
           <div class="setup-row">
@@ -973,7 +973,12 @@ function resetAzulScores() {
 
 function addRound() {
   if (!azulState.started) return;
-  azulState.rounds.push(new Array(azulState.playerCount).fill(0));
+
+  const lastRound = azulState.rounds.length
+    ? [...azulState.rounds[azulState.rounds.length - 1]]
+    : new Array(azulState.playerCount).fill(0);
+
+  azulState.rounds.push(lastRound);
   saveAzulState();
   renderAzulTracker();
 }
@@ -987,9 +992,12 @@ function updateRoundScore(roundIndex, playerIndex, value) {
 }
 
 function calculateTotals() {
-  return azulState.players.map((_, playerIndex) =>
-    azulState.rounds.reduce((sum, round) => sum + (Number(round[playerIndex]) || 0), 0)
-  );
+  if (!azulState.rounds.length) {
+    return azulState.players.map(() => 0);
+  }
+
+  const lastRound = azulState.rounds[azulState.rounds.length - 1];
+  return azulState.players.map((_, i) => Number(lastRound[i]) || 0);
 }
 
 function getLeaderText(totals) {
