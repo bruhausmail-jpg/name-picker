@@ -406,7 +406,7 @@
     <section class="screen" id="azulScreen">
       <div class="azul-wrap card">
         <h2>Azul Score Tracker</h2>
-        <p class="azul-intro">Enter the running total after each round. The top score cards will show each player's latest total.</p>
+        <p class="azul-intro">Enter the running total after each round. New rounds start blank, and the top score cards show each player's latest entered total.</p>
 
         <div id="setupArea">
           <div class="setup-row">
@@ -484,7 +484,7 @@ const newGameBtn = document.getElementById("newGameBtn");
 const resetScoresBtn = document.getElementById("resetScoresBtn");
 
 const STORAGE_KEY = "spinWheelPremium_v5";
-const AZUL_STORAGE_KEY = "azulTracker_v2";
+const AZUL_STORAGE_KEY = "azulTracker_v3";
 const SCREEN_STORAGE_KEY = "gameNightHelper_activeScreen";
 
 const cx = 170;
@@ -852,8 +852,8 @@ function loadAzulState() {
     const rounds = Array.isArray(saved.rounds)
       ? saved.rounds.map(round => {
           const clean = Array.isArray(round) ? round.slice(0, count) : [];
-          while (clean.length < count) clean.push(0);
-          return clean.map(v => Number(v) || 0);
+          while (clean.length < count) clean.push("");
+          return clean.map(v => v === "" || v === null || typeof v === "undefined" ? "" : String(v));
         })
       : [];
 
@@ -951,7 +951,7 @@ function startAzulGame() {
   };
 
   if (!azulState.rounds.length) {
-    azulState.rounds.push(new Array(count).fill(0));
+    azulState.rounds.push(new Array(count).fill(""));
   }
 
   saveAzulState();
@@ -966,7 +966,7 @@ function newAzulGameSetup() {
 
 function resetAzulScores() {
   if (!azulState.started) return;
-  azulState.rounds = [new Array(azulState.playerCount).fill(0)];
+  azulState.rounds = [new Array(azulState.playerCount).fill("")];
   saveAzulState();
   renderAzulTracker();
 }
@@ -974,15 +974,7 @@ function resetAzulScores() {
 function addRound() {
   if (!azulState.started) return;
 
-  const newRound = new Array(azulState.playerCount).fill(0);
-
-  if (azulState.rounds.length) {
-    const lastRound = azulState.rounds[azulState.rounds.length - 1];
-    for (let i = 0; i < azulState.playerCount; i++) {
-      newRound[i] = Number(lastRound[i]) || 0;
-    }
-  }
-
+  const newRound = new Array(azulState.playerCount).fill("");
   azulState.rounds.push(newRound);
   saveAzulState();
   renderAzulTracker();
@@ -990,19 +982,25 @@ function addRound() {
 
 function updateRoundScore(roundIndex, playerIndex, value) {
   if (!azulState.rounds[roundIndex]) return;
-  const num = Number(value);
-  azulState.rounds[roundIndex][playerIndex] = Number.isFinite(num) ? num : 0;
+
+  const trimmed = String(value).trim();
+  azulState.rounds[roundIndex][playerIndex] = trimmed === "" ? "" : trimmed;
+
   saveAzulState();
   renderTotalsOnly();
 }
 
 function calculateTotals() {
-  if (!azulState.rounds.length) {
-    return azulState.players.map(() => 0);
-  }
-
-  const lastRound = azulState.rounds[azulState.rounds.length - 1];
-  return azulState.players.map((_, playerIndex) => Number(lastRound[playerIndex]) || 0);
+  return azulState.players.map((_, playerIndex) => {
+    for (let roundIndex = azulState.rounds.length - 1; roundIndex >= 0; roundIndex--) {
+      const value = azulState.rounds[roundIndex]?.[playerIndex];
+      if (value !== "" && value !== null && typeof value !== "undefined") {
+        const num = Number(value);
+        if (Number.isFinite(num)) return num;
+      }
+    }
+    return 0;
+  });
 }
 
 function getLeaderText(totals) {
@@ -1066,9 +1064,13 @@ function renderScoreTable() {
 
       const input = document.createElement("input");
       input.type = "number";
+      input.inputMode = "numeric";
+      input.pattern = "[0-9-]*";
+      input.enterKeyHint = "done";
       input.className = "round-input";
       input.value = score;
       input.step = "1";
+      input.placeholder = "—";
       input.addEventListener("input", (e) => {
         updateRoundScore(roundIndex, playerIndex, e.target.value);
       });
